@@ -6,10 +6,11 @@ import secrets
 from datetime import timedelta
 
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.core.exceptions import DomainException
+from apps.core.exceptions import DomainException, StateConflict
 
 from .models import User
 
@@ -63,9 +64,10 @@ def generate_tokens(user: User) -> tuple[str, str]:
     return str(refresh.access_token), str(refresh)
 
 
-def create_password_reset_token(email: str) -> str | None:
+def create_password_reset_token(email: str, base_url: str = "http://localhost:3000") -> str | None:
     """
     Creates a password reset token for the user with the given email.
+    Dispatches Celery email notification.
     Returns None silently if the email doesn't exist (to prevent enumeration).
     """
     try:
@@ -74,9 +76,22 @@ def create_password_reset_token(email: str) -> str | None:
         return None
 
     token = secrets.token_urlsafe(48)
-    user.invite_token = token  # Reusing invite_token field for password reset
+    user.invite_token = token
     user.invite_expires_at = timezone.now() + timedelta(hours=1)
     user.save(update_fields=["invite_token", "invite_expires_at"])
+
+    reset_link = f"{base_url}/reset-password?token={token}"
+
+    try:
+        from apps.notifications.tasks import send_password_reset_email
+
+        user_id = str(user.id)
+        transaction.on_commit(
+            lambda: send_password_reset_email.delay(user_id=user_id, reset_link=reset_link)
+        )
+    except Exception:
+        pass
+
     return token
 
 
@@ -121,6 +136,68 @@ def change_password(user: User, current_password: str, new_password: str) -> Non
     user.save(update_fields=["password", "must_change_password"])
 
 
+def update_user_role_and_status(
+    user: User,
+    actor: User,
+    new_role: str | None = None,
+    is_active: bool | None = None,
+    request=None,
+) -> User:
+    """
+    Updates a user's role and/or active status with safety checks and audit logging.
+    Prevents demoting or deactivating the last active HR Admin.
+    """
+    from apps.audit import services as audit_services
+    from apps.audit.models import AuditAction
+
+    # Check if target is HR_ADMIN and is being demoted or deactivated
+    demoting = new_role is not None and new_role != "HR_ADMIN" and user.role == "HR_ADMIN"
+    deactivating = is_active is False and user.is_active and user.role == "HR_ADMIN"
+
+    if demoting or deactivating:
+        remaining_hr = (
+            User.objects.filter(role="HR_ADMIN", is_active=True).exclude(id=user.id).count()
+        )
+        if remaining_hr == 0:
+            raise StateConflict(
+                message="Cannot demote or deactivate the last HR Admin.",
+                details={"reason": "LAST_HR_ADMIN"},
+            )
+
+    before_snapshot = {"role": user.role, "is_active": user.is_active}
+    update_fields = []
+
+    if new_role is not None and new_role != user.role:
+        user.role = new_role
+        update_fields.append("role")
+
+    if is_active is not None and is_active != user.is_active:
+        user.is_active = is_active
+        update_fields.append("is_active")
+
+    if update_fields:
+        user.save(update_fields=update_fields)
+        after_snapshot = {"role": user.role, "is_active": user.is_active}
+
+        action = (
+            AuditAction.USER_ROLE_CHANGED
+            if "role" in update_fields
+            else AuditAction.USER_DEACTIVATED
+        )
+        audit_services.log(
+            actor=actor,
+            action=action,
+            entity=user,
+            entity_label=user.email,
+            before=before_snapshot,
+            after=after_snapshot,
+            summary=f"Updated user {user.email}: {', '.join(update_fields)}",
+            request=request,
+        )
+
+    return user
+
+
 def _validate_password_policy(password: str) -> None:
     """Enforce password policy rules."""
     errors = []
@@ -147,8 +224,8 @@ def get_password_policy() -> dict:
         "require_special": True,
         "rules": [
             "At least 8 characters",
-            "At least one uppercase letter (A\u2013Z)",
-            "At least one digit (0\u20139)",
+            "At least one uppercase letter (A–Z)",
+            "At least one digit (0–9)",
             "At least one special character (!@#$%^&*...)",
         ],
     }
