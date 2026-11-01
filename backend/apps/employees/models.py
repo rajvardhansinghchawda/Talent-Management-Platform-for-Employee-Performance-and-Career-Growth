@@ -71,3 +71,31 @@ class Employee(BaseModel):
         if self.photo:
             return self.photo.url
         return None
+
+
+class ManagerHistory(BaseModel):
+    """Tracks reporting manager assignments and changes over time."""
+
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="manager_history")
+    manager = models.ForeignKey(
+        Employee,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="historical_reports",
+    )
+    effective_date = models.DateField()
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    reason = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "employees_managerhistory"
+        ordering = ["-effective_date", "-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.employee} managed by {self.manager} since {self.effective_date}"

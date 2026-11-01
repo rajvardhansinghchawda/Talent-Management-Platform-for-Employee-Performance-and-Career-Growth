@@ -250,6 +250,11 @@ class UserListView(APIView):
         serializer = UserManagementSerializer(qs, many=True)
         return Response(serializer.data)
 
+    def post(self, request: Request) -> Response:
+        from apps.employees.views import UserEmployeeCreateView
+
+        return UserEmployeeCreateView().post(request)
+
 
 class UserDetailView(APIView):
     """PATCH /api/v1/users/{id}/ (HR Admin only)"""

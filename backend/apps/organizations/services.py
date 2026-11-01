@@ -1,12 +1,12 @@
-"""Organization domain services — settings management and branding."""
+"""Organization domain services — settings management, branding, and department hierarchy."""
 
 from __future__ import annotations
 
 from apps.audit import services as audit_services
 from apps.audit.models import AuditAction
-from apps.core.exceptions import DomainException
+from apps.core.exceptions import DomainException, StateConflict
 
-from .models import Organization
+from .models import Department, Organization
 from .serializers import (
     CareerSettingsSerializer,
     GeneralSettingsSerializer,
@@ -110,7 +110,6 @@ def update_organization_settings(
     new_settings = {**current_settings, **clean_data}
     setattr(org, field_name, new_settings)
 
-    # Sync top-level fields for general group
     if group == "general":
         if "name" in clean_data:
             org.name = clean_data["name"]
@@ -120,7 +119,6 @@ def update_organization_settings(
     org.save()
     after_snapshot = dict(new_settings)
 
-    # Audit the settings change
     audit_services.log(
         actor=actor,
         action=AuditAction.ORG_SETTINGS_CHANGED,
@@ -142,7 +140,6 @@ def update_organization_settings(
 
 def update_organization_logo(file, actor, request=None) -> str:
     """Validate and upload organization branding logo."""
-    # Max 2 MB
     max_bytes = 2 * 1024 * 1024
     if file.size > max_bytes:
         raise DomainException(
@@ -171,3 +168,110 @@ def update_organization_logo(file, actor, request=None) -> str:
     )
 
     return org.logo_url or ""
+
+
+# ─── Department Services ───────────────────────────────────────────────────────
+
+
+def get_department_tree() -> list[dict]:
+    """
+    Returns hierarchical department tree:
+    [{ id, name, head: {id, name}|null, employee_count, can_delete, children: [...] }]
+    """
+    all_depts = list(
+        Department.objects.all()
+        .select_related("head", "parent")
+        .prefetch_related("employees", "children")
+        .order_by("sort_order", "name")
+    )
+
+    children_map: dict[str, list] = {}
+
+    for d in all_depts:
+        parent_id = d.parent_id
+        if parent_id not in children_map:
+            children_map[parent_id] = []
+        children_map[parent_id].append(d)
+
+    def build_node(dept: Department) -> dict:
+        children = [build_node(child) for child in children_map.get(dept.id, [])]
+        emp_count = dept.employees.filter(is_active=True).count()
+        can_delete = emp_count == 0 and len(children) == 0
+
+        head_data = None
+        if dept.head:
+            head_data = {"id": str(dept.head.id), "name": dept.head.full_name}
+
+        return {
+            "id": str(dept.id),
+            "name": dept.name,
+            "head": head_data,
+            "sort_order": dept.sort_order,
+            "employee_count": emp_count,
+            "can_delete": can_delete,
+            "children": children,
+        }
+
+    # Roots have parent_id=None
+    roots = children_map.get(None, [])
+    return [build_node(root) for root in roots]
+
+
+def validate_no_department_cycle(dept_id, new_parent_id) -> None:
+    """Ensures setting new_parent does not cause a cycle in the department hierarchy."""
+    if not new_parent_id:
+        return
+    if str(dept_id) == str(new_parent_id):
+        raise StateConflict(
+            message="A department cannot be its own parent.",
+            details={"reason": "CYCLE_DETECTED"},
+        )
+
+    curr_id = new_parent_id
+    visited = {str(dept_id)}
+
+    while curr_id:
+        if str(curr_id) in visited:
+            raise StateConflict(
+                message="Setting this parent creates a cycle in the department hierarchy.",
+                details={"reason": "CYCLE_DETECTED"},
+            )
+        visited.add(str(curr_id))
+        parent_dept = (
+            Department.objects.filter(id=curr_id).values_list("parent_id", flat=True).first()
+        )
+        curr_id = parent_dept
+
+
+def delete_department(dept: Department, actor, request=None) -> None:
+    """
+    Deletes department if it has no active employees and no sub-departments.
+    Raises StateConflict (409) with counts otherwise.
+    """
+    emp_count = dept.employees.filter(is_active=True).count()
+    if emp_count > 0:
+        raise StateConflict(
+            message=f"Department cannot be deleted because it contains {emp_count} active employee(s).",
+            details={"reason": "HAS_EMPLOYEES", "employee_count": emp_count},
+        )
+
+    children_count = dept.children.count()
+    if children_count > 0:
+        raise StateConflict(
+            message=f"Department cannot be deleted because it contains {children_count} sub-department(s).",
+            details={"reason": "HAS_CHILDREN", "children_count": children_count},
+        )
+
+    dept_name = dept.name
+    dept_id = str(dept.id)
+    dept.delete()
+
+    audit_services.log(
+        actor=actor,
+        action=AuditAction.ORG_SETTINGS_CHANGED,
+        entity=dept,
+        entity_id=dept_id,
+        entity_label=f"Department: {dept_name}",
+        summary=f"Deleted department '{dept_name}'",
+        request=request,
+    )

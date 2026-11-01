@@ -19,4 +19,7 @@ urlpatterns = [
         views.OrganizationLogoUploadView.as_view(),
         name="organization-logo",
     ),
+    path("departments/", views.DepartmentListCreateView.as_view(), name="department-list"),
+    path("departments/tree/", views.DepartmentTreeListView.as_view(), name="department-tree"),
+    path("departments/<uuid:pk>/", views.DepartmentDetailView.as_view(), name="department-detail"),
 ]
