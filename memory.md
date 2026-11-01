@@ -34,26 +34,109 @@ Talent Management Platform for Employee Performance and Career Growth: A multi-p
 ## Current State
 - **Phase 0 completed**: Project scaffolding, split settings, 14 apps, base models, Celery queues, Docker configuration, CI pipeline, and pure-python domain engines.
 - **Phase 1 completed**: Auth endpoints, session cookie refresh, forced password change middleware, user management, typed organization settings, and audit trails.
-- **Phase 2 completed**:
-  - Departments tree (`/api/v1/departments/tree/`), CRUD, circular reference prevention, and deletion safeguards.
-  - User and Employee atomic creation (`POST /api/v1/users/`), temporary password generation, and invite tokens.
-  - Employee directory with privacy filtering (`/api/v1/employees/?scope=directory` hides phone, bio, compensation).
-  - Employee self-service updates (`PATCH /api/v1/employees/me/` with strict whitelist).
-  - Reporting hierarchy management (`POST /api/v1/employees/{id}/change-manager/`) with circular reference detection.
-  - Manager history tracking (`ManagerHistory` model and `GET /api/v1/employees/{id}/manager-history/`).
-  - Employee lifecycle: deactivation/reactivation with last HR Admin protection.
-  - CSV Import engine: template download, preview with row validation, Celery background processor (`run_employee_import`), and progress tracking.
-  - Management command `manage.py seed_demo_data [--reset]` seeding organization, departments, job roles, users, and employees (including Rahul).
-  - Automated tests for employee hierarchy, cycle prevention, directory scoping, and CSV preview.
+- **Phase 2 completed**: Department tree with cycle prevention and deletion guards, employee directory with privacy scoping, employee self-service profile, manager assignment and reporting hierarchy, and CSV import pipeline.
+- **Phase 3 completed**:
+  - Goals CRUD (`/api/v1/goals/`) with role scoping (employee sees own, manager sees team reporting tree, HR sees org).
+  - Parent hierarchy cycle prevention (`validate_no_goal_cycle`) returning `409 state_conflict` (`CYCLE_DETECTED`).
+  - Goal submission workflow (`/api/v1/goals/{id}/submit/`): completeness validation (target != start, weight > 0), locks edits (`is_locked=True`), sets `PENDING_APPROVAL`, notifies manager (`GOAL_APPROVAL_NEEDED`).
+  - Goal approval workflow (`/api/v1/goals/{id}/approve/`): blocks self-approval, moves to `ACTIVE`, creates `GoalComment`, notifies employee (`GOAL_DECISION`).
+  - Goal rejection workflow (`/api/v1/goals/{id}/reject/`): mandatory comment validation, returns goal to `DRAFT`, creates `GoalComment(kind=REJECTION)`, notifies employee.
+  - Progress updates (`/api/v1/goals/{id}/updates/`): append-only `GoalUpdate` records on `ACTIVE` goals, updates `current_value`, does not auto-complete.
+  - Goal completion (`/api/v1/goals/{id}/complete/`): explicit action from `ACTIVE`, enforces completion note if target unmet.
+  - Goal scoring (`/api/v1/goals/score/`): weighted score computation across eligible `ACTIVE` and `COMPLETED` goals, respects org `goal_score_cap`, returns per-goal breakdown and contributions.
+  - Alignment visualization (`/api/v1/goals/{id}/alignment/` and `/api/v1/goals/alignment/` forest).
+  - General goal comments (`/api/v1/goals/{id}/comments/`).
+  - Automated tests in `backend/apps/performance/tests/test_goals.py`.
 
 ## Known Issues
 - Remote git repository not configured yet; changes tracked locally on branch `master`.
 
 ## Pending Work
-- Phase 3: Goals & KPI Tracking Engine (KPI/OKR metrics, directional scoring, progress updates, approval workflows, comments).
-- Subsequent phases (4–9) per implementation blueprint.
+- Phase 4: Review Cycles, Review Workflow, Calibration Board, and Final Ratings.
+- Subsequent phases (5–9) per implementation blueprint.
 
 ## Interaction History
+
+### 2026-11-01 23:05
+
+**User Request**
+> Continue with implementation (Phase 3: Goals and KPI Tracking Engine).
+
+**Exploration**
+- Inspected Phase 3 requirements in `phase_wise_prompts.md` and `backend_agenthandover (1).md` §7.1, §7.2, §7.3, §8.1.
+- Analyzed Goal model properties (`progress_pct`, `score`, `is_locked`, `can_update_progress`, `can_complete`).
+- Examined scoring formula, org setting cap, parent cycle detection, and approval/rejection state transitions.
+
+**Work Done**
+- Implemented Phase 3 Backend:
+  1. `apps/performance/models.py`:
+     - Added `submitted_at` datetime field to `Goal`.
+     - Added computed properties `progress_pct`, `score`, `is_locked`, `can_update_progress`, and `can_complete`.
+  2. `apps/performance/serializers.py`:
+     - `GoalListSerializer`, `GoalDetailSerializer`, `GoalCreateSerializer`, `GoalUpdateSerializer`.
+     - `GoalUpdateProgressSerializer`, `GoalCompleteSerializer`, `GoalApprovalSerializer`, `GoalRejectionSerializer`.
+     - `GoalProgressUpdateItemSerializer`, `GoalCommentItemSerializer`.
+     - `GoalScoreSummarySerializer` with `GoalContributionSerializer`.
+     - `ReviewCycleSimpleSerializer`.
+  3. `apps/performance/services.py`:
+     - `validate_no_goal_cycle`: detects circular parent references with `409 state_conflict` (`CYCLE_DETECTED`).
+     - `get_goal_score_cap`: reads `goal_score_cap` from organization settings (default 1.0, max 1.5).
+     - `create_goal`: creates DRAFT goal for employees; creates ACTIVE goal for manager-assigned goals with notification.
+     - `update_goal`: blocks edits on locked (`PENDING_APPROVAL`) or finished goals (`409 GOAL_LOCKED`).
+     - `submit_goal_for_approval`: validates target != start, weight > 0, transitions to `PENDING_APPROVAL`, notifies manager (`GOAL_APPROVAL_NEEDED`).
+     - `approve_goal`: blocks self-approval, transitions to `ACTIVE`, creates `GoalComment`, notifies employee (`GOAL_DECISION`).
+     - `reject_goal`: enforces non-empty comment, transitions to `DRAFT`, creates `GoalComment(kind=REJECTION)`, notifies employee.
+     - `add_goal_progress_update`: enforces `ACTIVE` status, updates `current_value`, creates append-only `GoalUpdate`.
+     - `complete_goal`: enforces `ACTIVE` status, requires completion note if target unmet, sets `COMPLETED` and `completed_at`.
+     - `get_goal_alignment`: builds ancestor chain, self, and children.
+     - `get_employee_goals_score`: calculates weighted score and per-goal contributions with org cap.
+  4. `apps/performance/selectors.py`:
+     - `list_goals`: role-based scoping (employee own, manager team/reports, HR org), with filters (`cycle`, `status`, `for_parent`, `q`, `ordering`).
+     - `get_goal_by_id`, `list_goal_updates`, `list_goal_comments`, `list_review_cycles`.
+     - `get_alignment_forest`: builds tree rooted at company/department goals.
+  5. `apps/performance/views.py`:
+     - `GoalListCreateView`, `GoalDetailView`, `GoalSubmitView`, `GoalApproveView`, `GoalRejectView`.
+     - `GoalUpdatesView`, `GoalCompleteView`, `GoalAlignmentView`, `GoalAlignmentTreeView`.
+     - `GoalCommentsView`, `GoalScoreSummaryView`, `ReviewCycleListView`.
+  6. `apps/performance/urls.py`:
+     - Registered all 12 routes under `/api/v1/`.
+  7. `apps/performance/tests/test_goals.py`:
+     - Comprehensive tests for goal creation, manager assignment, reporting tree enforcement, cycle prevention, submit validation, edit lock, approval/rejection, progress updates, completion rules, score breakdown with cap, and team scoping.
+  8. Code Quality Verification:
+     - Formatted and linted with Ruff: 189 files, 0 errors.
+
+**Files Changed**
+- `backend/apps/performance/models.py`
+  - Added `submitted_at` and computed properties.
+- `backend/apps/performance/serializers.py`
+  - Added typed serializers for goals, updates, comments, cycles, and score breakdown.
+- `backend/apps/performance/services.py`
+  - Added domain logic for cycle prevention, create, update, submit, approve, reject, updates, completion, alignment, and scoring.
+- `backend/apps/performance/selectors.py`
+  - Added queries with role-based scoping and tree construction.
+- `backend/apps/performance/views.py`
+  - Added endpoints with object-level permissions and tenant isolation.
+- `backend/apps/performance/urls.py`
+  - Wired performance endpoints.
+- `backend/apps/performance/tests/test_goals.py`
+  - Comprehensive test suite for Phase 3.
+- `memory.md`
+  - Updated project state and interaction history.
+
+**Verification**
+- `python -m ruff check backend`: Passed (0 errors).
+- `python -m ruff format backend`: Passed (189 files clean).
+
+**Response**
+- Summarized Phase 3 implementation and verified clean codebase.
+
+**Git**
+- Branch: `master`
+- Commit: pending
+- Push: None (remote not configured yet)
+- Status: Clean working tree after commit
+
+---
 
 ### 2026-11-01 22:54
 

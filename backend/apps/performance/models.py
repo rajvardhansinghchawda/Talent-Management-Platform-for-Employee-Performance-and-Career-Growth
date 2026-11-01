@@ -99,6 +99,7 @@ class Goal(BaseModel):
     weight = models.DecimalField(max_digits=5, decimal_places=2, default=1.0)
     due_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=25, choices=GoalStatus.choices, default=GoalStatus.DRAFT)
+    submitted_at = models.DateTimeField(null=True, blank=True)
 
     completed_at = models.DateTimeField(null=True, blank=True)
     completion_note = models.TextField(blank=True)
@@ -117,6 +118,30 @@ class Goal(BaseModel):
         if self.due_date and self.status not in (GoalStatus.COMPLETED, GoalStatus.CANCELLED):
             return self.due_date < timezone.now().date()
         return False
+
+    @property
+    def progress_pct(self):
+        from apps.performance.goal_engine import compute_progress_pct
+
+        return compute_progress_pct(self)
+
+    @property
+    def score(self):
+        from apps.performance.goal_engine import compute_goal_score
+
+        return compute_goal_score(self)
+
+    @property
+    def is_locked(self) -> bool:
+        return self.status == GoalStatus.PENDING_APPROVAL
+
+    @property
+    def can_update_progress(self) -> bool:
+        return self.status == GoalStatus.ACTIVE
+
+    @property
+    def can_complete(self) -> bool:
+        return self.status == GoalStatus.ACTIVE
 
 
 class GoalUpdate(BaseModel):
