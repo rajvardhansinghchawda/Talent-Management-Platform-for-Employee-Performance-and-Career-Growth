@@ -106,9 +106,11 @@ export default function EmployeeLearningPage() {
                       </Badge>
                       <span className="text-xs text-slate-400">{rec.course.provider}</span>
                     </div>
-                    <CardTitle className="text-base font-bold text-slate-900 mt-2">
-                      {rec.course.title}
-                    </CardTitle>
+                    <Link href={`/employee/learning/${rec.course.id}`} className="hover:text-indigo-600 transition-colors">
+                      <CardTitle className="text-base font-bold text-slate-900 mt-2">
+                        {rec.course.title}
+                      </CardTitle>
+                    </Link>
                   </CardHeader>
                   <CardContent className="p-6 pt-0 space-y-4 text-xs">
                     <div className="p-3 rounded-lg bg-indigo-50/70 border border-indigo-100 text-indigo-900 font-medium">
@@ -180,9 +182,11 @@ export default function EmployeeLearningPage() {
                       <span>{c.provider}</span>
                       <Badge variant="secondary" className="text-[10px]">{c.difficulty}</Badge>
                     </div>
-                    <CardTitle className="text-sm font-bold text-slate-900 leading-snug">
-                      {c.title}
-                    </CardTitle>
+                    <Link href={`/employee/learning/${c.id}`} className="hover:text-indigo-600 transition-colors">
+                      <CardTitle className="text-sm font-bold text-slate-900 leading-snug">
+                        {c.title}
+                      </CardTitle>
+                    </Link>
                     <CardDescription className="text-xs text-slate-500 line-clamp-2 mt-1">
                       {c.description}
                     </CardDescription>
@@ -246,9 +250,11 @@ export default function EmployeeLearningPage() {
                         </div>
                       </div>
 
-                      <Button size="sm" variant="outline" className="text-xs">
-                        Continue Learning
-                      </Button>
+                      <Link href={`/employee/learning/${en.course?.id}`}>
+                        <Button size="sm" variant="outline" className="text-xs">
+                          Continue Learning
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 </Card>

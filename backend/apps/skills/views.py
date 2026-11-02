@@ -157,7 +157,7 @@ class JobRoleCareerStepsView(APIView):
 
     def get(self, request: Request, pk: uuid.UUID) -> Response:
         role = selectors.get_job_role_by_id(pk)
-        steps = role.career_steps_from.select_related("to_role")
+        steps = role.next_steps.select_related("to_role")
         return Response(CareerPathStepSerializer(steps, many=True).data)
 
     def post(self, request: Request, pk: uuid.UUID) -> Response:

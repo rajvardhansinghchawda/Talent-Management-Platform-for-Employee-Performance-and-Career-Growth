@@ -277,7 +277,8 @@ export default function TeamGoalsPage() {
           />
         ) : (
           <Card>
-            <div className="overflow-x-auto">
+            {/* Desktop Table (md:block, hidden on mobile) */}
+            <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -322,6 +323,41 @@ export default function TeamGoalsPage() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+
+            {/* Mobile Stacked Cards (< md) */}
+            <div className="block md:hidden divide-y divide-slate-100">
+              {goals.map((g) => (
+                <div key={g.id} className="p-4 space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-bold text-slate-900 text-sm block">{g.title}</span>
+                    <StatusChip status={g.status} />
+                  </div>
+
+                  <div className="flex items-center space-x-2 text-xs">
+                    <Badge variant="outline" className="text-[10px] font-mono">
+                      {g.goal_type}
+                    </Badge>
+                    <span className="text-slate-400">·</span>
+                    <span className="text-slate-500">Weight: <strong>{g.weight}%</strong></span>
+                    <span className="text-slate-400">·</span>
+                    <span className="text-slate-500">{g.due_date ? formatDate(g.due_date) : "No due date"}</span>
+                  </div>
+
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-500 font-medium">Progress</span>
+                      <span className="font-bold text-indigo-600">{g.progress_pct}%</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className="h-full bg-indigo-600 rounded-full"
+                        style={{ width: `${g.progress_pct}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </Card>
         )

@@ -209,7 +209,8 @@ export default function SkillsPage() {
         />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
+          {/* Desktop Table (md:block, hidden on mobile) */}
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -286,6 +287,74 @@ export default function SkillsPage() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobile Stacked Cards (< md) */}
+          <div className="block md:hidden divide-y divide-slate-100">
+            {skills.map((s) => (
+              <div key={s.id} className="p-4 space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-7 h-7 rounded bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0">
+                      <Award className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-900 text-xs block">{s.name}</span>
+                      <span className="text-[10px] text-slate-500">{s.category || "General"}</span>
+                    </div>
+                  </div>
+                  <Badge variant={s.is_active ? "success" : "secondary"} className="text-[10px]">
+                    {s.is_active ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+
+                {s.description && (
+                  <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed bg-slate-50 p-2 rounded">
+                    {s.description}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center space-x-3 text-[11px] text-slate-500">
+                    <span className="flex items-center">
+                      <Users className="w-3 h-3 mr-1 text-slate-400" />
+                      {s.usage?.employees ?? 0}
+                    </span>
+                    <span className="flex items-center">
+                      <Briefcase className="w-3 h-3 mr-1 text-slate-400" />
+                      {s.usage?.roles ?? 0}
+                    </span>
+                    <span className="flex items-center">
+                      <BookOpen className="w-3 h-3 mr-1 text-slate-400" />
+                      {s.usage?.courses ?? 0}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(s)}
+                      className="h-7 px-2 text-xs"
+                    >
+                      <Edit2 className="w-3 h-3 mr-1 text-slate-500" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDeleteError(null);
+                        setDeleteSkill(s);
+                      }}
+                      className="h-7 px-2 text-xs text-rose-600 border-rose-200"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}

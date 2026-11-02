@@ -139,7 +139,8 @@ export default function TeamReviewsPage() {
         />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
+          {/* Desktop Table (md:block, hidden on mobile) */}
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -206,6 +207,63 @@ export default function TeamReviewsPage() {
                 })}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobile Stacked Cards (< md) */}
+          <div className="block md:hidden divide-y divide-slate-100">
+            {reviews.map((r: any) => {
+              const isManagerTurn = r.status === "MANAGER_REVIEW";
+              return (
+                <div key={r.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-bold text-slate-900 text-sm block">{r.employee?.name}</span>
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        {r.employee?.employee_code} · {r.cycle?.name || "Appraisal Cycle"}
+                      </span>
+                    </div>
+                    <StatusChip status={r.status} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block uppercase font-medium">Self Rating</span>
+                      <span className="font-bold text-slate-800">{r.self_rating ? `${r.self_rating} / 5` : "Pending"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block uppercase font-medium">Manager Rating</span>
+                      <span className="font-bold text-indigo-600">{r.manager_rating ? `${r.manager_rating} / 5` : "—"}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      {isManagerTurn ? (
+                        <Badge variant="default" className="text-[10px] bg-indigo-600 text-white font-bold">
+                          Action Required
+                        </Badge>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 italic">
+                          {r.status === "SELF_ASSESSMENT" ? "Awaiting Employee" : "In Progress"}
+                        </span>
+                      )}
+                    </div>
+                    <Link href={`/manager/reviews/${r.id}`}>
+                      <Button
+                        size="sm"
+                        className={`h-8 px-3 text-xs ${
+                          isManagerTurn
+                            ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        {isManagerTurn ? "Evaluate Now" : "View Review"}
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}

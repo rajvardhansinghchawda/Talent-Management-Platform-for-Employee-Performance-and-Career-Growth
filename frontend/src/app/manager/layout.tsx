@@ -52,7 +52,7 @@ export default function ManagerLayout({
       {/* Main Content Area */}
       <div className="flex flex-col flex-1 min-w-0">
         <ManagerTopBar />
-        <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto min-w-0 overflow-x-hidden">
           <Breadcrumbs />
           {children}
         </main>

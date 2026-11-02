@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Bell, Users, LogOut, ArrowRightLeft, Sparkles, Building2, CheckCheck, SlidersHorizontal, Key } from "lucide-react";
+import { Search, Bell, Users, LogOut, ArrowRightLeft, Sparkles, Building2, CheckCheck, SlidersHorizontal, Key, Menu } from "lucide-react";
+import { useMobileNav } from "@/components/shell/MobileNavContext";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api/client";
@@ -24,6 +25,7 @@ export function ManagerTopBar() {
   const queryClient = useQueryClient();
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const { toggle } = useMobileNav();
 
   const { data: notifications } = useQuery<NotificationItem[]>({
     queryKey: ["manager-notifications"],
@@ -43,15 +45,24 @@ export function ManagerTopBar() {
     },
   });
   return (
-    <header className="h-16 border-b border-slate-200 bg-white sticky top-0 z-20 flex items-center justify-between px-6">
-      {/* Search Input */}
-      <div className="relative w-72">
-        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-        <input
-          type="text"
-          placeholder="Search team members, goals, skills..."
-          className="w-full pl-9 pr-4 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400"
-        />
+    <header className="h-16 border-b border-slate-200 bg-white sticky top-0 z-20 flex items-center justify-between px-4 sm:px-6">
+      {/* Left controls: Hamburger on mobile + Search */}
+      <div className="flex items-center">
+        <button
+          onClick={toggle}
+          className="lg:hidden mr-2 p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
+          title="Toggle Navigation Menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <div className="relative w-36 sm:w-56 md:w-72">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search..."
+            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400"
+          />
+        </div>
       </div>
 
       {/* Right Controls */}

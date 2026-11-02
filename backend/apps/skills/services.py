@@ -84,7 +84,6 @@ def add_career_step(
     step, _ = CareerPathStep.objects.get_or_create(
         from_role=from_role,
         to_role=to_role,
-        defaults={"typical_duration_months": typical_duration_months},
     )
     return step
 

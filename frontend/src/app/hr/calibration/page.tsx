@@ -231,7 +231,8 @@ export default function CalibrationPage() {
         />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
+          {/* Desktop Table (md:block, hidden on mobile) */}
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -301,6 +302,70 @@ export default function CalibrationPage() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobile Stacked Cards (< md) */}
+          <div className="block md:hidden divide-y divide-slate-100">
+            {reviews.map((r) => (
+              <div key={r.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-bold text-slate-900 text-sm block">{r.employee.name}</span>
+                    <span className="text-[11px] text-slate-500 font-mono">
+                      {r.employee.employee_code} · {r.employee.department}
+                    </span>
+                  </div>
+                  <StatusChip status={r.status} />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block uppercase">Self</span>
+                    <span className="font-bold text-slate-800">{r.self_rating ? `${r.self_rating}/5` : "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block uppercase">Manager</span>
+                    <span className="font-bold text-slate-800">{r.manager_rating ? `${r.manager_rating}/5` : "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block uppercase">Calibrated</span>
+                    <span className="font-bold text-indigo-600">
+                      {r.calibrated_rating || r.proposed_calibrated_rating
+                        ? `${r.calibrated_rating || r.proposed_calibrated_rating}/5`
+                        : "—"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[11px] text-slate-500">
+                    Evaluator: <strong>{r.manager?.name || "Manager"}</strong>
+                  </span>
+                  <div className="flex items-center space-x-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openAdjustDialog(r)}
+                      className="h-8 px-2.5 text-xs text-indigo-600 border-indigo-200"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 mr-1" />
+                      Adjust
+                    </Button>
+                    {r.has_dispute && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setReopenReview(r)}
+                        className="h-8 px-2 text-xs text-amber-600"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                        Reopen
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}

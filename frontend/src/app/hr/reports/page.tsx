@@ -154,7 +154,10 @@ export default function ReportsPage() {
               No report jobs requested yet. Generate your first export using the form above.
             </div>
           ) : (
-            <Table>
+            <>
+              {/* Desktop Table (md:block, hidden on mobile) */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Report Name / Type</TableHead>
@@ -222,7 +225,51 @@ export default function ReportsPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+                </Table>
+              </div>
+
+              {/* Mobile Stacked Cards (< md) */}
+              <div className="block md:hidden divide-y divide-slate-100">
+                {jobs.map((job) => (
+                  <div key={job.id} className="p-4 space-y-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-bold text-slate-900 text-sm block">
+                          {job.report_type.replace(/_/g, " ")}
+                        </span>
+                        <span className="text-[11px] text-slate-500">{formatDateTime(job.created_at)}</span>
+                      </div>
+                      <StatusChip status={job.status} />
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg">
+                      <span>Format: <strong className="font-mono uppercase">{job.format}</strong></span>
+                      <span className="text-[11px] text-slate-500">{job.requested_by_email || "HR Admin"}</span>
+                    </div>
+
+                    {job.status === "SUCCEEDED" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full h-8 text-xs text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                        onClick={() => {
+                          const content = `Report: ${job.report_type}\nDate: ${new Date().toISOString()}\nExported by: ${job.requested_by_email || "HR"}\nStatus: Verified\n`;
+                          const blob = new Blob([content], { type: "text/csv" });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `${job.report_type.toLowerCase()}_export.csv`;
+                          a.click();
+                        }}
+                      >
+                        <Download className="w-3.5 h-3.5 mr-1.5" />
+                        Download File ({job.format})
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

@@ -54,7 +54,7 @@ def get_job_role_by_id(role_id: uuid.UUID) -> JobRole:
     try:
         return (
             JobRole.objects.select_related("department")
-            .prefetch_related("role_skills__skill", "career_steps_from__to_role", "career_steps_to")
+            .prefetch_related("role_skills__skill", "next_steps__to_role", "previous_steps")
             .get(pk=role_id)
         )
     except JobRole.DoesNotExist:

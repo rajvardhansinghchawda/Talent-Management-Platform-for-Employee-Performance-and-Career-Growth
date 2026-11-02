@@ -141,7 +141,7 @@ export default function DepartmentsPage() {
       <div key={node.id} className="relative">
         <div
           className={`flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white hover:border-indigo-300 hover:shadow-xs transition-all my-1.5 ${
-            depth > 0 ? "ml-8" : ""
+            depth > 0 ? "ml-3 sm:ml-5 md:ml-8" : ""
           }`}
         >
           <div className="flex items-center space-x-3">
@@ -205,7 +205,7 @@ export default function DepartmentsPage() {
         </div>
 
         {hasChildren && isExpanded && (
-          <div className="border-l border-slate-200 ml-6 pl-2">
+          <div className="border-l border-slate-200 ml-3 sm:ml-5 md:ml-6 pl-1 sm:pl-2">
             {node.children!.map((child) => renderTreeNode(child, depth + 1))}
           </div>
         )}

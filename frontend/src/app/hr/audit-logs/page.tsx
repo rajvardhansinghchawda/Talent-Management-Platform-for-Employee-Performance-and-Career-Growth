@@ -123,7 +123,8 @@ export default function AuditLogsPage() {
         />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
+          {/* Desktop Table (md:block, hidden on mobile) */}
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -171,6 +172,44 @@ export default function AuditLogsPage() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobile Stacked Cards (< md) */}
+          <div className="block md:hidden divide-y divide-slate-100">
+            {logs.map((log) => (
+              <div key={log.id} className="p-4 space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <Badge variant="outline" className="text-[10px] uppercase font-mono bg-slate-50">
+                    {log.action.replace(/_/g, " ")}
+                  </Badge>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    {formatDateTime(log.created_at)}
+                  </span>
+                </div>
+
+                <div className="text-xs">
+                  <span className="font-semibold text-slate-900 block">
+                    {log.entity.label || log.entity.id}
+                  </span>
+                  <p className="text-slate-600 mt-1 leading-relaxed">{log.summary}</p>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                  <span className="text-[11px] text-slate-500">
+                    By: <strong>{log.actor_name || log.actor_email || "System"}</strong>
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedLog(log)}
+                    className="h-7 px-2.5 text-xs text-indigo-600 border-indigo-200"
+                  >
+                    <Eye className="w-3.5 h-3.5 mr-1" />
+                    View Diff
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}

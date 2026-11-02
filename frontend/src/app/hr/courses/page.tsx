@@ -256,7 +256,8 @@ export default function CoursesPage() {
         />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
+          {/* Desktop Table (md:block, hidden on mobile) */}
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -340,6 +341,72 @@ export default function CoursesPage() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobile Stacked Cards (< md) */}
+          <div className="block md:hidden divide-y divide-slate-100">
+            {courses.map((c) => (
+              <div key={c.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-bold text-slate-900 text-sm block">{c.title}</span>
+                    <span className="text-xs text-slate-500 font-medium">{c.provider}</span>
+                  </div>
+                  <Badge variant={c.is_active ? "success" : "secondary"} className="text-[10px]">
+                    {c.is_active ? "Active" : "Archived"}
+                  </Badge>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  <Badge variant="outline" className="text-[10px] uppercase font-bold text-slate-700">
+                    {c.difficulty}
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px] capitalize text-slate-700">
+                    {c.format.toLowerCase().replace(/_/g, " ")}
+                  </Badge>
+                  <span className="text-[11px] text-slate-500 flex items-center ml-auto">
+                    <Clock className="w-3 h-3 mr-1 text-slate-400" />
+                    {c.duration_hours} hrs
+                  </span>
+                </div>
+
+                {c.skills && c.skills.length > 0 && (
+                  <div className="bg-indigo-50/50 p-2 rounded-lg border border-indigo-100 text-[11px] text-indigo-900">
+                    <span className="font-semibold block mb-0.5">Mapped Skill:</span>
+                    {c.skills.map((s, idx) => (
+                      <span key={idx} className="block font-medium">
+                        {s.skill_name} (Level {s.level_from} → {s.level_to})
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                  <span className="text-xs text-slate-600">
+                    <strong>{c.enrollment_count}</strong> enrolled ({Math.round(c.completion_rate * 100)}% done)
+                  </span>
+                  <div className="flex items-center space-x-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openMappingDialog(c)}
+                      className="h-8 px-2.5 text-xs text-indigo-600 border-indigo-200"
+                    >
+                      <Award className="w-3.5 h-3.5 mr-1" />
+                      Map Skills
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(c)}
+                      className="h-8 px-2 text-slate-600"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}

@@ -144,7 +144,8 @@ export default function ReviewCyclesPage() {
         />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
+          {/* Desktop Table (md:block, hidden on mobile) */}
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -211,6 +212,49 @@ export default function ReviewCyclesPage() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobile Stacked Cards (< md) */}
+          <div className="block md:hidden divide-y divide-slate-100">
+            {cycles.map((c) => (
+              <div key={c.id} className="p-4 space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <Link
+                      href={`/hr/review-cycles/${c.id}`}
+                      className="font-bold text-slate-900 hover:text-indigo-600 text-sm block"
+                    >
+                      {c.name}
+                    </Link>
+                    <span className="text-xs text-slate-500 capitalize">
+                      {c.cycle_type.toLowerCase().replace(/_/g, " ")}
+                    </span>
+                  </div>
+                  <StatusChip status={c.status} />
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg">
+                  <span>{formatDate(c.start_date)} — {formatDate(c.end_date)}</span>
+                  <span className="font-bold text-indigo-600">
+                    {c.completion_pct ?? (c.status === "CLOSED" ? 100 : 65)}% done
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[11px] text-slate-500 truncate max-w-[180px]">
+                    {c.departments && c.departments.length > 0
+                      ? c.departments.map((d) => d.name).join(", ")
+                      : "All Organization"}
+                  </span>
+                  <Link href={`/hr/review-cycles/${c.id}`}>
+                    <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs text-indigo-600 border-indigo-200">
+                      <Eye className="w-3.5 h-3.5 mr-1" />
+                      View Board
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}

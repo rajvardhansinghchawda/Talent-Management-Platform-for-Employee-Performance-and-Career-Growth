@@ -214,7 +214,8 @@ export default function EmployeesListPage() {
         />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
+          {/* Desktop Table (md:block, hidden on mobile) */}
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -306,6 +307,86 @@ export default function EmployeesListPage() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobile Stacked Cards (< md) */}
+          <div className="block md:hidden divide-y divide-slate-100">
+            {employees.map((emp) => (
+              <div key={emp.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs shrink-0 border border-indigo-200">
+                      {emp.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
+                    </div>
+                    <div>
+                      <Link
+                        href={`/hr/employees/${emp.id}`}
+                        className="font-bold text-slate-900 hover:text-indigo-600 text-sm block"
+                      >
+                        {emp.name}
+                      </Link>
+                      <span className="text-xs text-slate-500 font-mono">{emp.employee_code}</span>
+                    </div>
+                  </div>
+                  <StatusChip status={emp.employment_status} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-medium block uppercase tracking-wider">Role</span>
+                    <span className="font-medium text-slate-800">{emp.job_role?.title || emp.job_title || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-medium block uppercase tracking-wider">Department</span>
+                    <span className="font-medium text-slate-800">{emp.department?.name || "—"}</span>
+                  </div>
+                  <div className="col-span-2 pt-1 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400">Reports to:</span>
+                    <span className="font-medium text-slate-700">{emp.manager?.name || "None (Root)"}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end space-x-2 pt-1">
+                  <Link href={`/hr/employees/${emp.id}`} className="flex-1">
+                    <Button variant="outline" size="sm" className="w-full h-8 text-xs">
+                      <Eye className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                      View Profile
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setChangeManagerEmp(emp)}
+                    className="h-8 px-2.5 text-xs text-slate-700"
+                    title="Change Manager"
+                  >
+                    <UserCheck className="w-3.5 h-3.5 mr-1 text-indigo-600" />
+                    Manager
+                  </Button>
+                  {emp.employment_status === "ACTIVE" ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDeactivateEmp(emp)}
+                      className="h-8 px-2.5 text-xs text-rose-600 border-rose-200 hover:bg-rose-50"
+                      title="Deactivate"
+                    >
+                      <UserX className="w-3.5 h-3.5 text-rose-500" />
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReactivateEmp(emp)}
+                      className="h-8 px-2.5 text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                      title="Reactivate"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-emerald-500" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}

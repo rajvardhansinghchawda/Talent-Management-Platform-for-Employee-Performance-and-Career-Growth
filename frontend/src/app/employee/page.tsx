@@ -295,7 +295,9 @@ export default function EmployeeDashboardPage() {
         <Card>
           <CardHeader className="p-4 pb-2 border-b border-slate-100">
             <CardTitle className="text-xs font-semibold text-slate-900 flex items-center justify-between">
-              Recent Feedback
+              <Link href="/employee/feedback" className="hover:text-indigo-600 transition-colors">
+                Recent Feedback
+              </Link>
               <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
             </CardTitle>
           </CardHeader>
@@ -320,7 +322,9 @@ export default function EmployeeDashboardPage() {
         <Card>
           <CardHeader className="p-4 pb-2 border-b border-slate-100">
             <CardTitle className="text-xs font-semibold text-slate-900 flex items-center justify-between">
-              Recognition Badges
+              <Link href="/employee/recognition" className="hover:text-indigo-600 transition-colors">
+                Recognition Badges
+              </Link>
               <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
             </CardTitle>
           </CardHeader>
@@ -345,7 +349,9 @@ export default function EmployeeDashboardPage() {
         <Card>
           <CardHeader className="p-4 pb-2 border-b border-slate-100">
             <CardTitle className="text-xs font-semibold text-slate-900 flex items-center justify-between">
-              Upcoming 1:1s
+              <Link href="/employee/one-on-ones" className="hover:text-indigo-600 transition-colors">
+                Upcoming 1:1s
+              </Link>
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
             </CardTitle>
           </CardHeader>
@@ -367,7 +373,9 @@ export default function EmployeeDashboardPage() {
         <Card>
           <CardHeader className="p-4 pb-2 border-b border-slate-100">
             <CardTitle className="text-xs font-semibold text-slate-900 flex items-center justify-between">
-              Action Items
+              <Link href="/employee/development-plan" className="hover:text-indigo-600 transition-colors">
+                Action Items
+              </Link>
               <CheckSquare className="w-3.5 h-3.5 text-slate-400" />
             </CardTitle>
           </CardHeader>

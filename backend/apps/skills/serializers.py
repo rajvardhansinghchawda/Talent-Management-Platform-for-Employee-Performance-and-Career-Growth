@@ -75,7 +75,6 @@ class CareerPathStepSerializer(serializers.ModelSerializer):
             "to_role_title",
             "to_role_track",
             "to_role_level",
-            "typical_duration_months",
         ]
 
 
@@ -105,7 +104,7 @@ class JobRoleDetailSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source="department.name", read_only=True)
     employee_count = serializers.SerializerMethodField()
     skills = RoleSkillSerializer(source="role_skills", many=True, read_only=True)
-    next_roles = CareerPathStepSerializer(source="career_steps_from", many=True, read_only=True)
+    next_roles = CareerPathStepSerializer(source="next_steps", many=True, read_only=True)
 
     class Meta:
         model = JobRole

@@ -199,7 +199,8 @@ export default function JobRolesPage() {
         />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
+          {/* Desktop Table (md:block, hidden on mobile) */}
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -259,6 +260,49 @@ export default function JobRolesPage() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobile Stacked Cards (< md) */}
+          <div className="block md:hidden divide-y divide-slate-100">
+            {roles.map((r) => (
+              <div key={r.id} className="p-4 space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <Link
+                      href={`/hr/roles/${r.id}`}
+                      className="font-bold text-slate-900 hover:text-indigo-600 text-sm block"
+                    >
+                      {r.title}
+                    </Link>
+                    <span className="text-xs text-slate-500">{r.department_name || "Company-Wide"}</span>
+                  </div>
+                  <Badge variant="outline" className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 border-indigo-200">
+                    L{r.level}
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-slate-600 pt-1">
+                  <span className="flex items-center">
+                    <Users className="w-3.5 h-3.5 mr-1 text-slate-400" />
+                    {r.employee_count} {r.employee_count === 1 ? "person" : "people"}
+                  </span>
+                  {r.is_critical && (
+                    <Badge variant="destructive" className="text-[10px] uppercase">
+                      Critical Role
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="pt-2">
+                  <Link href={`/hr/roles/${r.id}`}>
+                    <Button variant="outline" size="sm" className="w-full h-8 text-xs">
+                      <Eye className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                      View Role Ladder & Skills
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}
