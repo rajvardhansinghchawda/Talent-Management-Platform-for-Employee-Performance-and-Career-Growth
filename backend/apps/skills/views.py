@@ -8,6 +8,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.constants import Role
+from apps.core.exceptions import DomainException
 from apps.core.permissions import HasRole
 from apps.skills import selectors, services
 from apps.skills.models import RoleSkill
@@ -71,7 +73,7 @@ class SkillDeactivateView(APIView):
 
 
 class JobRoleListCreateView(APIView):
-    permission_classes = [IsAuthenticated, HasRole.hr_admin()]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
         q = request.query_params.get("q")
@@ -86,6 +88,8 @@ class JobRoleListCreateView(APIView):
         return Response(serializer.data)
 
     def post(self, request: Request) -> Response:
+        if request.user.role != Role.HR_ADMIN:
+            raise DomainException("Forbidden.", code="forbidden", status_code=403)
         serializer = JobRoleCreateUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         role = serializer.save()
@@ -93,13 +97,15 @@ class JobRoleListCreateView(APIView):
 
 
 class JobRoleDetailView(APIView):
-    permission_classes = [IsAuthenticated, HasRole.hr_admin()]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request: Request, pk: uuid.UUID) -> Response:
         role = selectors.get_job_role_by_id(pk)
         return Response(JobRoleDetailSerializer(role).data)
 
     def patch(self, request: Request, pk: uuid.UUID) -> Response:
+        if request.user.role != Role.HR_ADMIN:
+            raise DomainException("Forbidden.", code="forbidden", status_code=403)
         role = selectors.get_job_role_by_id(pk)
         serializer = JobRoleCreateUpdateSerializer(role, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -108,7 +114,7 @@ class JobRoleDetailView(APIView):
 
 
 class JobRoleSkillsView(APIView):
-    permission_classes = [IsAuthenticated, HasRole.hr_admin()]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request: Request, pk: uuid.UUID) -> Response:
         role = selectors.get_job_role_by_id(pk)
@@ -116,6 +122,8 @@ class JobRoleSkillsView(APIView):
         return Response(RoleSkillSerializer(skills, many=True).data)
 
     def post(self, request: Request, pk: uuid.UUID) -> Response:
+        if request.user.role != Role.HR_ADMIN:
+            raise DomainException("Forbidden.", code="forbidden", status_code=403)
         role = selectors.get_job_role_by_id(pk)
         serializer = RoleSkillCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -123,6 +131,8 @@ class JobRoleSkillsView(APIView):
         return Response(RoleSkillSerializer(rs).data, status=status.HTTP_201_CREATED)
 
     def put(self, request: Request, pk: uuid.UUID) -> Response:
+        if request.user.role != Role.HR_ADMIN:
+            raise DomainException("Forbidden.", code="forbidden", status_code=403)
         role = selectors.get_job_role_by_id(pk)
         if not isinstance(request.data, list):
             return Response(
@@ -221,23 +231,122 @@ class EmployeeSkillsListView(APIView):
         skills = Skill.objects.filter(is_active=True)
         results = []
         for s in skills:
-            assessments = SkillAssessment.objects.filter(employee=emp, skill=s).order_by("-created_at")
+            assessments = SkillAssessment.objects.filter(employee=emp, skill=s).order_by(
+                "-created_at"
+            )
             validated = assessments.filter(status="VALIDATED").first()
             self_ass = assessments.filter(source="SELF").first()
             pending = assessments.filter(status="PENDING").exists()
 
             if validated or self_ass or pending:
-                results.append({
-                    "skill": {
-                        "id": str(s.id),
-                        "name": s.name,
-                        "category": s.category,
-                        "description": s.description,
-                    },
-                    "self_level": self_ass.level if self_ass else None,
-                    "validated_level": validated.level if validated else None,
-                    "last_validated_on": validated.created_at.isoformat() if validated else None,
-                    "status": "VALIDATED" if validated else "SELF_REPORTED" if self_ass else "UNVALIDATED",
-                    "has_pending_validation": pending,
-                })
+                results.append(
+                    {
+                        "skill": {
+                            "id": str(s.id),
+                            "name": s.name,
+                            "category": s.category,
+                            "description": s.description,
+                        },
+                        "self_level": self_ass.level if self_ass else None,
+                        "validated_level": validated.level if validated else None,
+                        "last_validated_on": validated.created_at.isoformat()
+                        if validated
+                        else None,
+                        "status": "VALIDATED"
+                        if validated
+                        else "SELF_REPORTED"
+                        if self_ass
+                        else "UNVALIDATED",
+                        "has_pending_validation": pending,
+                    }
+                )
         return Response(results)
+
+
+class SkillAssessmentListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        from apps.employees.selectors import get_employee_for_user, reports_to_tree
+        from apps.skills.models import SkillAssessment
+        from apps.skills.serializers import SkillAssessmentQueueSerializer
+
+        scope = request.query_params.get("scope")
+        status_filter = request.query_params.get("status")
+
+        qs = SkillAssessment.objects.select_related("employee__department", "skill").all()
+        if scope == "team" and request.user.role == "MANAGER":
+            mgr_emp = get_employee_for_user(request.user)
+            if mgr_emp:
+                subordinates = reports_to_tree(mgr_emp, include_self=False)
+                qs = qs.filter(employee__in=subordinates)
+            else:
+                return Response([])
+
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        serializer = SkillAssessmentQueueSerializer(qs, many=True)
+        return Response(serializer.data)
+
+
+class SkillAssessmentValidateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, pk: uuid.UUID) -> Response:
+        from django.utils import timezone
+
+        from apps.core.exceptions import NotFound
+        from apps.skills.models import SkillAssessment
+
+        try:
+            assessment = SkillAssessment.objects.get(pk=pk)
+        except SkillAssessment.DoesNotExist:
+            raise NotFound(message="Skill assessment not found.")
+
+        adjusted_level = request.data.get("adjusted_level")
+        note = request.data.get("note", "")
+
+        if adjusted_level:
+            assessment.level = int(adjusted_level)
+        assessment.status = "VALIDATED"
+        assessment.validated_by = request.user
+        assessment.validated_on = timezone.now().date()
+        if note:
+            assessment.evidence_note = f"{assessment.evidence_note}\n[Manager Validation Note]: {note}".strip()
+        assessment.save()
+        return Response({"status": "VALIDATED", "level": assessment.level})
+
+
+class SkillAssessmentRejectView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, pk: uuid.UUID) -> Response:
+        from apps.core.exceptions import NotFound
+        from apps.skills.models import SkillAssessment
+
+        try:
+            assessment = SkillAssessment.objects.get(pk=pk)
+        except SkillAssessment.DoesNotExist:
+            raise NotFound(message="Skill assessment not found.")
+
+        reason = request.data.get("reason", "")
+        assessment.status = "REJECTED"
+        assessment.rejection_reason = reason
+        assessment.save()
+        return Response({"status": "REJECTED", "reason": reason})
+
+
+class SkillAssessmentBulkValidateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request) -> Response:
+        from django.utils import timezone
+
+        from apps.skills.models import SkillAssessment
+
+        ids = request.data.get("ids", [])
+        updated = SkillAssessment.objects.filter(id__in=ids, status="PENDING").update(
+            status="VALIDATED", validated_by=request.user, validated_on=timezone.now().date()
+        )
+        return Response({"validated_count": updated})

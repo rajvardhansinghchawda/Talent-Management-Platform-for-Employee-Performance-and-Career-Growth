@@ -272,3 +272,169 @@ export interface OrganizationSettings {
     retention_years: number;
   };
 }
+
+export interface ManagerDashboardData {
+  pending: {
+    goal_approvals: number;
+    reviews_due: number;
+    skill_validations: number;
+    plans_awaiting_approval: number;
+  };
+  team_goal_progress: {
+    overall_pct: number;
+    by_employee: Array<{
+      employee_id: string;
+      name: string;
+      weighted_score: number;
+    }>;
+  };
+  review_cycle_progress: {
+    cycle?: { id: string; name: string } | null;
+    counts: Record<string, number>;
+    completion_pct: number;
+  };
+  top_team_gaps: Array<{
+    skill: string;
+    affected_count: number;
+    avg_gap: number;
+  }>;
+  readiness: {
+    near_ready: Array<{ employee_id: string; name: string }>;
+    ready_for_review: Array<{ employee_id: string; name: string }>;
+  };
+  upcoming_one_on_ones: Array<{
+    id: string;
+    employee: { id: string; name: string };
+    scheduled_at?: string | null;
+    status?: string;
+  }>;
+}
+
+export interface ManagerTeamRosterItem {
+  id: string;
+  employee: {
+    id: string;
+    name: string;
+    employee_code: string;
+    photo_url?: string | null;
+  };
+  role: string;
+  department: string;
+  goal_score: number;
+  review_status: string;
+  readiness_status: string;
+  open_actions_count: number;
+}
+
+export interface ManagerTeamMemberOverview {
+  profile_summary: {
+    name: string;
+    employee_code: string;
+    job_title?: string | null;
+    department?: string | null;
+    joining_date?: string | null;
+  };
+  goal_score: number;
+  latest_rating: number;
+  top_gaps: Array<{ skill: string; gap: number }>;
+  readiness: string;
+}
+
+export interface SkillAssessmentQueueItem {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  employee_code: string;
+  department: string;
+  skill: string;
+  skill_name: string;
+  skill_category: string;
+  level: number;
+  source: string;
+  status: string;
+  evidence_note?: string;
+  evidence_url?: string;
+  assessed_on: string;
+  created_at: string;
+}
+
+export interface OneOnOneItem {
+  id: string;
+  manager: string;
+  manager_name: string;
+  employee: string;
+  employee_name: string;
+  employee_code: string;
+  scheduled_at: string;
+  status: string;
+  shared_notes: string;
+  private_notes: string;
+  private_notes_visible_to_you: boolean;
+  action_items: Array<{
+    id: string;
+    title: string;
+    owner_name: string;
+    due_date?: string | null;
+    status: string;
+  }>;
+  created_at: string;
+}
+
+export interface FeedbackItem {
+  id: string;
+  from_employee?: string | null;
+  from_name?: string | null;
+  to_employee: string;
+  to_name: string;
+  feedback_type: string;
+  visibility: string;
+  visibility_label: string;
+  content: string;
+  created_at: string;
+}
+
+export interface DevelopmentPlanItem {
+  id: string;
+  title: string;
+  item_type: string;
+  course?: string | null;
+  course_title?: string | null;
+  skill?: string | null;
+  skill_name?: string | null;
+  status: string;
+  due_date?: string | null;
+  created_at: string;
+}
+
+export interface DevelopmentPlanRecord {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  employee_code: string;
+  target_role?: string | null;
+  target_role_title?: string;
+  start_date?: string | null;
+  target_date?: string | null;
+  status: string;
+  progress_pct: number;
+  item_count: number;
+  items: DevelopmentPlanItem[];
+  created_at: string;
+}
+
+export interface GoalItem {
+  id: string;
+  title: string;
+  owner_id?: string;
+  owner_name?: string;
+  goal_type: string;
+  direction: string;
+  weight: string | number;
+  target_value: string | number;
+  current_value: string | number;
+  progress_pct: number;
+  status: string;
+  due_date?: string | null;
+  submitted_at?: string | null;
+  created_at?: string;
+}

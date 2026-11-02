@@ -89,7 +89,9 @@ class ReviewCycleListView(APIView):
 
     def post(self, request):
         if request.user.role != UserRole.HR_ADMIN:
-            raise DomainException("Only HR Admin can create review cycles.", code="permission_denied", status_code=403)
+            raise DomainException(
+                "Only HR Admin can create review cycles.", code="permission_denied", status_code=403
+            )
         serializer = ReviewCycleCreateUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         cycle = serializer.save()
@@ -375,9 +377,9 @@ class HRDashboardView(APIView):
             return Response(serializer.data)
         except Exception as e:
             import traceback
+
             traceback.print_exc()
             raise e
-
 
 
 class EmployeeDashboardView(APIView):
@@ -388,6 +390,14 @@ class EmployeeDashboardView(APIView):
         if not emp:
             raise DomainException("Employee profile not found.", code="not_found", status_code=404)
         data = selectors.get_employee_dashboard_data(emp)
+        return Response(data)
+
+
+class ExecutiveDashboardView(APIView):
+    permission_classes = [IsAuthenticated, HasRole.executive()]
+
+    def get(self, request):
+        data = selectors.get_executive_dashboard_data()
         return Response(data)
 
 
@@ -405,29 +415,38 @@ class EmployeeReviewsListView(APIView):
         )
         items = []
         for r in reviews:
-            items.append({
-                "id": str(r.id),
-                "cycle": {
-                    "id": str(r.cycle.id),
-                    "name": r.cycle.name,
-                    "start_date": str(r.cycle.start_date),
-                    "end_date": str(r.cycle.end_date),
-                },
-                "status": r.status,
-                "self_rating": r.self_rating,
-                "manager_rating": r.manager_rating if r.status == ReviewStatus.COMPLETED else None,
-                "calibrated_rating": r.calibrated_rating if r.status == ReviewStatus.COMPLETED else None,
-                "final_rating": r.final_rating if r.status == ReviewStatus.COMPLETED else None,
-                "manager_comments": r.manager_comments if r.status == ReviewStatus.COMPLETED else None,
-                "next_action": (
-                    "START_SELF_ASSESSMENT"
-                    if not r.self_assessment_submitted_at
-                    else "VIEW_RESULT"
+            items.append(
+                {
+                    "id": str(r.id),
+                    "cycle": {
+                        "id": str(r.cycle.id),
+                        "name": r.cycle.name,
+                        "start_date": str(r.cycle.start_date),
+                        "end_date": str(r.cycle.end_date),
+                    },
+                    "status": r.status,
+                    "self_rating": r.self_rating,
+                    "manager_rating": r.manager_rating
                     if r.status == ReviewStatus.COMPLETED
-                    else "NONE"
-                ),
-            })
+                    else None,
+                    "calibrated_rating": r.calibrated_rating
+                    if r.status == ReviewStatus.COMPLETED
+                    else None,
+                    "final_rating": r.final_rating if r.status == ReviewStatus.COMPLETED else None,
+                    "manager_comments": r.manager_comments
+                    if r.status == ReviewStatus.COMPLETED
+                    else None,
+                    "next_action": (
+                        "START_SELF_ASSESSMENT"
+                        if not r.self_assessment_submitted_at
+                        else "VIEW_RESULT"
+                        if r.status == ReviewStatus.COMPLETED
+                        else "NONE"
+                    ),
+                }
+            )
         return Response(items)
+
 
 class ReviewCycleDetailView(APIView):
     permission_classes = [IsAuthenticated, HasRole.hr_admin()]
@@ -465,7 +484,7 @@ class ReviewCycleActivateView(APIView):
 
     def post(self, request, pk):
         cycle = selectors.get_review_cycle_by_id(pk)
-        activated = services.activate_review_cycle(cycle)
+        activated = services.activate_review_cycle(cycle, actor=request.user)
         return Response(ReviewCycleDetailSerializer(activated).data)
 
 
@@ -474,7 +493,8 @@ class ReviewCycleStartCalibrationView(APIView):
 
     def post(self, request, pk):
         cycle = selectors.get_review_cycle_by_id(pk)
-        calibrated = services.start_calibration_cycle(cycle)
+        force = bool(request.data.get("force", False))
+        calibrated = services.start_calibration_cycle(cycle, actor=request.user, force=force)
         return Response(ReviewCycleDetailSerializer(calibrated).data)
 
 
@@ -483,7 +503,7 @@ class ReviewCycleCloseView(APIView):
 
     def post(self, request, pk):
         cycle = selectors.get_review_cycle_by_id(pk)
-        closed = services.close_review_cycle(cycle)
+        closed = services.close_review_cycle(cycle, actor=request.user)
         return Response(ReviewCycleDetailSerializer(closed).data)
 
 
@@ -825,3 +845,32 @@ class ReviewCycleRemindOverdueView(APIView):
 
         count = send_review_overdue_reminders()
         return Response({"reminders_sent": count})
+
+
+class ManagerDashboardView(APIView):
+    permission_classes = [IsAuthenticated, HasRole.manager()]
+
+    def get(self, request):
+        data = selectors.get_manager_dashboard_data(request.user)
+        return Response(data)
+
+
+class ManagerTeamRosterView(APIView):
+    permission_classes = [IsAuthenticated, HasRole.manager()]
+
+    def get(self, request):
+        q = request.query_params.get("q")
+        role = request.query_params.get("role")
+        review_status = request.query_params.get("review_status")
+        roster = selectors.list_manager_team_roster(
+            request.user, q=q, role=role, review_status=review_status
+        )
+        return Response(roster)
+
+
+class ManagerTeamMemberOverviewView(APIView):
+    permission_classes = [IsAuthenticated, HasRole.manager()]
+
+    def get(self, request, pk):
+        overview = selectors.get_manager_team_member_overview(request.user, pk)
+        return Response(overview)

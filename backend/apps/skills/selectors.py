@@ -37,7 +37,7 @@ def list_job_roles(
     department: uuid.UUID | None = None,
 ) -> QuerySet[JobRole]:
     qs = JobRole.objects.select_related("department").prefetch_related(
-        "role_skills", "career_steps_from"
+        "role_skills", "next_steps"
     )
     if department:
         qs = qs.filter(department_id=department)

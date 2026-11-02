@@ -34,7 +34,7 @@ export default function EmployeeReviewsListPage() {
     );
   }
 
-  const reviewList = Array.isArray(reviews) ? reviews : [];
+  const reviewList = Array.isArray(reviews) ? reviews : (reviews as any)?.results || [];
 
   return (
     <div className="space-y-6">
@@ -53,7 +53,7 @@ export default function EmployeeReviewsListPage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {reviewList.map((r) => (
+          {reviewList.map((r: any) => (
             <Card key={r.id} className="border-slate-200 hover:border-indigo-300 transition-colors">
               <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
                 <div>

@@ -120,7 +120,15 @@ class PasswordResetValidateSerializer(serializers.Serializer):
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
     token = serializers.CharField()
-    new_password = serializers.CharField(min_length=8, write_only=True)
+    new_password = serializers.CharField(min_length=8, write_only=True, required=False)
+    password = serializers.CharField(min_length=8, write_only=True, required=False)
+
+    def validate(self, attrs):
+        if not attrs.get("new_password") and not attrs.get("password"):
+            raise serializers.ValidationError({"new_password": ["This field is required."]})
+        if not attrs.get("new_password"):
+            attrs["new_password"] = attrs["password"]
+        return attrs
 
 
 class PasswordChangeSerializer(serializers.Serializer):

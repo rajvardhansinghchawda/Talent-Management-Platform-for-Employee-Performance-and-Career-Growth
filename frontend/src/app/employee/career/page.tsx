@@ -27,6 +27,7 @@ export default function CareerPage() {
     queryKey: ["all-roles"],
     queryFn: () => api.jobRoles.list(),
   });
+  const roleList = Array.isArray(roles) ? roles : (roles as any)?.results || [];
 
   const { data: pathGraph, isLoading: graphLoading } = useQuery({
     queryKey: ["career-path-graph"],
@@ -88,7 +89,7 @@ export default function CareerPage() {
               className="w-full h-9 px-3 rounded-md border border-slate-300 bg-white text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600"
             >
               <option value="">Default (Senior Backend Developer)</option>
-              {roles?.map((r) => (
+              {roleList.map((r: any) => (
                 <option key={r.id} value={r.id}>
                   {r.title} ({r.track} - L{r.level})
                 </option>

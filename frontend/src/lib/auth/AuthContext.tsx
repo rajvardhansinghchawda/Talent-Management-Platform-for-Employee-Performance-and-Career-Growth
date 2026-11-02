@@ -1,6 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { api, getAccessToken, setAccessToken } from "../api/client";
 import type { User } from "../api/types";
 
@@ -17,6 +19,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const pathname = usePathname();
+  const queryClient = useQueryClient();
 
   const refreshUser = async () => {
     try {
@@ -29,33 +33,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function initAuth() {
-      const isEmployeeRoute =
-        typeof window !== "undefined" && window.location.pathname.startsWith("/employee");
-      const targetEmail = isEmployeeRoute ? "rahul@acme.com" : "hr@acme.com";
+      const isEmployeeRoute = pathname?.startsWith("/employee");
+      const isManagerRoute = pathname?.startsWith("/manager");
+      const isExecutiveRoute = pathname?.startsWith("/executive");
+      const targetEmail = isEmployeeRoute
+        ? "rahul@acme.com"
+        : isManagerRoute
+        ? "manager@acme.com"
+        : isExecutiveRoute
+        ? "exec@acme.com"
+        : "hr@acme.com";
+
+      if (user?.email === targetEmail && getAccessToken()) {
+        setLoading(false);
+        return;
+      }
+
+      console.log("[AuthContext] initAuth switching to:", targetEmail);
 
       try {
-        const me = await api.auth.me();
-        if (isEmployeeRoute && me.email !== "rahul@acme.com") {
-          throw new Error("Switching to employee credentials");
-        }
-        setUser(me);
-      } catch {
-        try {
-          const res = await api.auth.login({
-            email: targetEmail,
-            password: "Password123!",
-          });
-          setAccessToken(res.access);
-          setUser(res.user);
-        } catch {
-          setUser(null);
-        }
+        const res = await api.auth.login({
+          email: targetEmail,
+          password: "Password123!",
+        });
+        console.log("[AuthContext] login succeeded for:", res.user.email);
+        setAccessToken(res.access);
+        setUser(res.user);
+        queryClient.invalidateQueries();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[AuthContext] login failed:", msg);
+        setUser(null);
       } finally {
         setLoading(false);
       }
     }
     initAuth();
-  }, []);
+  }, [pathname]);
 
   const login = async (email: string, password: string): Promise<User> => {
     const res = await api.auth.login({ email, password });

@@ -10,8 +10,9 @@ from .models import AuditLog
 def log(
     actor,
     action: str,
-    entity,
+    entity=None,
     entity_type: str | None = None,
+    entity_id: str | None = None,
     entity_label: str = "",
     before: dict | None = None,
     after: dict | None = None,
@@ -26,6 +27,7 @@ def log(
         action: An AuditAction constant string.
         entity: The model instance being acted upon. Can be a model or a plain dict with id/label.
         entity_type: Override for entity type name.
+        entity_id: Explicit entity id string if entity is not provided or to override.
         entity_label: Human-readable label for the entity.
         before: Snapshot of the entity before the change (no secrets).
         after: Snapshot of the entity after the change (no secrets).
@@ -33,18 +35,23 @@ def log(
         request: The original HTTP request (for IP/user-agent extraction).
     """
     # Derive entity info
-    if entity_type is None:
-        entity_type = type(entity).__name__
+    if entity is not None:
+        if entity_type is None:
+            entity_type = type(entity).__name__
 
-    if hasattr(entity, "pk"):
-        entity_id = str(entity.pk)
-    elif isinstance(entity, dict):
-        entity_id = str(entity.get("id", ""))
+        if hasattr(entity, "pk"):
+            entity_id = str(entity.pk)
+        elif isinstance(entity, dict):
+            entity_id = str(entity.get("id", ""))
+        elif entity_id is None:
+            entity_id = str(entity)
+
+        if not entity_label and hasattr(entity, "__str__"):
+            entity_label = str(entity)[:255]
     else:
-        entity_id = str(entity)
-
-    if not entity_label and hasattr(entity, "__str__"):
-        entity_label = str(entity)[:255]
+        entity_id = str(entity_id or "")
+        if entity_type is None:
+            entity_type = "unknown"
 
     # Compute field-level changes if both snapshots provided
     changes = None

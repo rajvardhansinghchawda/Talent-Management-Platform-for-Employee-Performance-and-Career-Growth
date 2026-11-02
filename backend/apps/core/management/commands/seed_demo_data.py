@@ -177,7 +177,9 @@ class Command(BaseCommand):
         # HR Admin
         hr_user = User.objects.filter(email="hr@acme.com").first()
         if not hr_user:
-            hr_user = User.objects.create_user(email="hr@acme.com", password=demo_password, role="HR_ADMIN", is_staff=True)
+            hr_user = User.objects.create_user(
+                email="hr@acme.com", password=demo_password, role="HR_ADMIN", is_staff=True
+            )
         else:
             hr_user.set_password(demo_password)
             hr_user.save()
@@ -197,7 +199,9 @@ class Command(BaseCommand):
         # Executive
         exec_user = User.objects.filter(email="exec@acme.com").first()
         if not exec_user:
-            exec_user = User.objects.create_user(email="exec@acme.com", password=demo_password, role="EXECUTIVE")
+            exec_user = User.objects.create_user(
+                email="exec@acme.com", password=demo_password, role="EXECUTIVE"
+            )
         else:
             exec_user.set_password(demo_password)
             exec_user.save()
@@ -205,7 +209,9 @@ class Command(BaseCommand):
         # Manager
         mgr_user = User.objects.filter(email="manager@acme.com").first()
         if not mgr_user:
-            mgr_user = User.objects.create_user(email="manager@acme.com", password=demo_password, role="MANAGER")
+            mgr_user = User.objects.create_user(
+                email="manager@acme.com", password=demo_password, role="MANAGER"
+            )
         else:
             mgr_user.set_password(demo_password)
             mgr_user.save()
@@ -228,7 +234,9 @@ class Command(BaseCommand):
         # Employee (Rahul Sharma)
         emp_user = User.objects.filter(email="rahul@acme.com").first()
         if not emp_user:
-            emp_user = User.objects.create_user(email="rahul@acme.com", password=demo_password, role="EMPLOYEE")
+            emp_user = User.objects.create_user(
+                email="rahul@acme.com", password=demo_password, role="EMPLOYEE"
+            )
         else:
             emp_user.set_password(demo_password)
             emp_user.save()
@@ -251,23 +259,84 @@ class Command(BaseCommand):
         )
         # 5. Goals for Rahul Sharma
 
-
         # Skills
-        py_skill, _ = Skill.objects.get_or_create(name="Python & Django", defaults={"category": "Backend", "description": "Core backend engineering with Django & DRF."})
-        sql_skill, _ = Skill.objects.get_or_create(name="PostgreSQL & SQL", defaults={"category": "Data", "description": "Relational query optimization, indexing, and migrations."})
-        sys_skill, _ = Skill.objects.get_or_create(name="System Design", defaults={"category": "Architecture", "description": "Scalable distributed architecture and caching."})
-        react_skill, _ = Skill.objects.get_or_create(name="React & Next.js", defaults={"category": "Frontend", "description": "Next.js App Router, TypeScript, and TanStack Query."})
+        py_skill, _ = Skill.objects.get_or_create(
+            name="Python & Django",
+            defaults={
+                "category": "Backend",
+                "description": "Core backend engineering with Django & DRF.",
+            },
+        )
+        sql_skill, _ = Skill.objects.get_or_create(
+            name="PostgreSQL & SQL",
+            defaults={
+                "category": "Data",
+                "description": "Relational query optimization, indexing, and migrations.",
+            },
+        )
+        sys_skill, _ = Skill.objects.get_or_create(
+            name="System Design",
+            defaults={
+                "category": "Architecture",
+                "description": "Scalable distributed architecture and caching.",
+            },
+        )
+        react_skill, _ = Skill.objects.get_or_create(
+            name="React & Next.js",
+            defaults={
+                "category": "Frontend",
+                "description": "Next.js App Router, TypeScript, and TanStack Query.",
+            },
+        )
 
         # Role requirements for target role (Senior Backend Developer)
         senior_role = roles["Senior Backend Developer"]
-        RoleSkill.objects.get_or_create(role=senior_role, skill=py_skill, defaults={"required_level": 4, "weight": 5, "is_must_have": True})
-        RoleSkill.objects.get_or_create(role=senior_role, skill=sql_skill, defaults={"required_level": 4, "weight": 4, "is_must_have": True})
-        RoleSkill.objects.get_or_create(role=senior_role, skill=sys_skill, defaults={"required_level": 4, "weight": 5, "is_must_have": True})
+        RoleSkill.objects.get_or_create(
+            role=senior_role,
+            skill=py_skill,
+            defaults={"required_level": 4, "weight": 5, "is_must_have": True},
+        )
+        RoleSkill.objects.get_or_create(
+            role=senior_role,
+            skill=sql_skill,
+            defaults={"required_level": 4, "weight": 4, "is_must_have": True},
+        )
+        RoleSkill.objects.get_or_create(
+            role=senior_role,
+            skill=sys_skill,
+            defaults={"required_level": 4, "weight": 5, "is_must_have": True},
+        )
 
         # Validated assessments for Rahul
-        SkillAssessment.objects.get_or_create(employee=rahul_emp, skill=py_skill, defaults={"level": 3, "status": SkillAssessmentStatus.VALIDATED, "source": SkillAssessmentSource.MANAGER, "validated_by": mgr_user})
-        SkillAssessment.objects.get_or_create(employee=rahul_emp, skill=sql_skill, defaults={"level": 3, "status": SkillAssessmentStatus.VALIDATED, "source": SkillAssessmentSource.MANAGER, "validated_by": mgr_user})
-        SkillAssessment.objects.get_or_create(employee=rahul_emp, skill=sys_skill, defaults={"level": 2, "status": SkillAssessmentStatus.PENDING, "source": SkillAssessmentSource.SELF})
+        SkillAssessment.objects.get_or_create(
+            employee=rahul_emp,
+            skill=py_skill,
+            defaults={
+                "level": 3,
+                "status": SkillAssessmentStatus.VALIDATED,
+                "source": SkillAssessmentSource.MANAGER,
+                "validated_by": mgr_user,
+            },
+        )
+        SkillAssessment.objects.get_or_create(
+            employee=rahul_emp,
+            skill=sql_skill,
+            defaults={
+                "level": 3,
+                "status": SkillAssessmentStatus.VALIDATED,
+                "source": SkillAssessmentSource.MANAGER,
+                "validated_by": mgr_user,
+            },
+        )
+        SkillAssessment.objects.get_or_create(
+            employee=rahul_emp,
+            skill=sys_skill,
+            defaults={
+                "level": 2,
+                "status": SkillAssessmentStatus.PENDING,
+                "source": SkillAssessmentSource.SELF,
+            },
+        )
 
         # Review Cycle & Review
         today = timezone.now().date()
@@ -280,7 +349,7 @@ class Command(BaseCommand):
                 "self_assessment_due": today + datetime.timedelta(days=10),
                 "manager_review_due": today + datetime.timedelta(days=20),
                 "status": CycleStatus.ACTIVE,
-            }
+            },
         )
         cycle.departments.add(departments["Engineering"])
 
@@ -290,7 +359,7 @@ class Command(BaseCommand):
             defaults={
                 "reviewer": mgr_emp,
                 "status": ReviewStatus.SELF_ASSESSMENT,
-            }
+            },
         )
 
         # Goals for Rahul
@@ -306,7 +375,7 @@ class Command(BaseCommand):
                 "current_value": Decimal("90.00"),
                 "status": GoalStatus.ACTIVE,
                 "due_date": today + datetime.timedelta(days=15),
-            }
+            },
         )
         Goal.objects.get_or_create(
             owner=rahul_emp,
@@ -320,7 +389,7 @@ class Command(BaseCommand):
                 "current_value": Decimal("80.00"),
                 "status": GoalStatus.ACTIVE,
                 "due_date": today + datetime.timedelta(days=20),
-            }
+            },
         )
         Goal.objects.get_or_create(
             owner=rahul_emp,
@@ -334,7 +403,7 @@ class Command(BaseCommand):
                 "current_value": Decimal("100.00"),
                 "status": GoalStatus.COMPLETED,
                 "due_date": today - datetime.timedelta(days=5),
-            }
+            },
         )
 
         # Courses & Enrollments
@@ -347,9 +416,11 @@ class Command(BaseCommand):
                 "duration_hours": Decimal("16.0"),
                 "description": "Deep dive into distributed systems, Redis caching, and resilient database design.",
                 "is_active": True,
-            }
+            },
         )
-        CourseSkill.objects.get_or_create(course=course1, skill=sys_skill, defaults={"level_from": 2, "level_to": 4})
+        CourseSkill.objects.get_or_create(
+            course=course1, skill=sys_skill, defaults={"level_from": 2, "level_to": 4}
+        )
 
         course2, _ = Course.objects.get_or_create(
             title="Next.js App Router Architecture & TanStack Query",
@@ -360,14 +431,16 @@ class Command(BaseCommand):
                 "duration_hours": Decimal("12.0"),
                 "description": "Mastering modern React patterns, server rendering, and server-state caching.",
                 "is_active": True,
-            }
+            },
         )
-        CourseSkill.objects.get_or_create(course=course2, skill=react_skill, defaults={"level_from": 2, "level_to": 4})
+        CourseSkill.objects.get_or_create(
+            course=course2, skill=react_skill, defaults={"level_from": 2, "level_to": 4}
+        )
 
         Enrollment.objects.get_or_create(
             employee=rahul_emp,
             course=course1,
-            defaults={"status": EnrollmentStatus.ENROLLED, "progress_pct": 60}
+            defaults={"status": EnrollmentStatus.ENROLLED, "progress_pct": 60},
         )
 
         # Development Plan
@@ -378,7 +451,7 @@ class Command(BaseCommand):
                 "status": DevelopmentPlanStatus.ACTIVE,
                 "start_date": today - datetime.timedelta(days=30),
                 "target_date": today + datetime.timedelta(days=120),
-            }
+            },
         )
         DevelopmentPlanItem.objects.get_or_create(
             plan=dev_plan,
@@ -387,7 +460,7 @@ class Command(BaseCommand):
                 "item_type": "COURSE",
                 "status": DevelopmentPlanItemStatus.IN_PROGRESS,
                 "due_date": today + datetime.timedelta(days=45),
-            }
+            },
         )
         DevelopmentPlanItem.objects.get_or_create(
             plan=dev_plan,
@@ -396,16 +469,21 @@ class Command(BaseCommand):
                 "item_type": "PROJECT",
                 "status": DevelopmentPlanItemStatus.PLANNED,
                 "due_date": today + datetime.timedelta(days=60),
-            }
+            },
         )
 
         # Badges & Recognitions
-        badge_tech, _ = Badge.objects.get_or_create(name="Technical Excellence", defaults={"description": "Awarded for exceptional engineering rigor and quality."})
+        badge_tech, _ = Badge.objects.get_or_create(
+            name="Technical Excellence",
+            defaults={"description": "Awarded for exceptional engineering rigor and quality."},
+        )
         Recognition.objects.get_or_create(
             from_employee=mgr_emp,
             to_employee=rahul_emp,
             badge=badge_tech,
-            defaults={"message": "Outstanding work designing and delivering the goals engine with cycle prevention!"}
+            defaults={
+                "message": "Outstanding work designing and delivering the goals engine with cycle prevention!"
+            },
         )
 
         # Feedback
@@ -415,8 +493,8 @@ class Command(BaseCommand):
             feedback_type=FeedbackType.STRENGTHS,
             defaults={
                 "visibility": FeedbackVisibility.EMPLOYEE_VISIBLE,
-                "content": "Rahul demonstrated deep initiative on the architecture refactor, taking full ownership of edge cases."
-            }
+                "content": "Rahul demonstrated deep initiative on the architecture refactor, taking full ownership of edge cases.",
+            },
         )
 
         # 1:1 Meeting & Action Items
@@ -426,14 +504,14 @@ class Command(BaseCommand):
             defaults={
                 "scheduled_at": timezone.now() + datetime.timedelta(days=3, hours=2),
                 "status": "SCHEDULED",
-                "shared_notes": "Discuss Q4 backend milestones, promotion readiness criteria, and System Design course progress."
-            }
+                "shared_notes": "Discuss Q4 backend milestones, promotion readiness criteria, and System Design course progress.",
+            },
         )
         ActionItem.objects.get_or_create(
             one_on_one=meeting,
             owner=rahul_emp,
             title="Finalize benchmark comparison between btree and hash indexes on goals table",
-            defaults={"status": "IN_PROGRESS", "due_date": today + datetime.timedelta(days=7)}
+            defaults={"status": "IN_PROGRESS", "due_date": today + datetime.timedelta(days=7)},
         )
 
         # Audit Logs

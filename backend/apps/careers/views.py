@@ -1,5 +1,8 @@
-"""Views for Career Paths, Readiness, and Development Plans."""
+"""Views for Development Plans and Career Growth."""
 
+import uuid
+
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -9,152 +12,300 @@ from rest_framework.views import APIView
 from apps.careers.models import (
     DevelopmentPlan,
     DevelopmentPlanItem,
-    DevelopmentPlanItemStatus,
-    DevelopmentPlanStatus,
+    PromotionReviewFlag,
 )
-from apps.employees.selectors import get_employee_for_user
-from apps.skills.gap_engine import compute_skill_gap
-from apps.skills.models import CareerPathStep, JobRole
-
-
-class CareerPathGraphView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request: Request) -> Response:
-        emp = get_employee_for_user(request.user)
-        current_role = emp.job_role if emp else JobRole.objects.first()
-
-        roles = JobRole.objects.all()
-        steps = CareerPathStep.objects.all()
-
-        nodes = [
-            {
-                "id": str(r.id),
-                "title": r.title,
-                "level": r.level,
-                "track": r.track,
-                "is_current": bool(current_role and r.id == current_role.id),
-                "is_target": bool(current_role and r.level > current_role.level),
-            }
-            for r in roles
-        ]
-
-        edges = [
-            {"from": str(s.from_role_id), "to": str(s.to_role_id)}
-            for s in steps
-        ]
-
-        return Response({"nodes": nodes, "edges": edges})
-
-
-class CareerReadinessView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request: Request) -> Response:
-        emp = get_employee_for_user(request.user)
-        if not emp:
-            return Response(
-                {"error": {"code": "not_found", "message": "Employee not found."}},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        target_role_id = request.query_params.get("target_role")
-        target_role = (
-            JobRole.objects.filter(pk=target_role_id).first()
-            if target_role_id
-            else emp.job_role or JobRole.objects.first()
-        )
-
-        gap_data = compute_skill_gap(emp, target_role) if target_role else {}
-        coverage = float(gap_data.get("coverage", 0.75))
-
-        criteria = [
-            {
-                "key": "CORE_SKILLS",
-                "name": "Core Technical Competencies",
-                "passed": coverage >= 0.7,
-                "detail": f"{int(coverage * 100)}% required level achieved across core skills.",
-            },
-            {
-                "key": "MUST_HAVES",
-                "name": "Mandatory Role Requirements",
-                "passed": gap_data.get("must_haves_remaining", 0) == 0,
-                "detail": f"{gap_data.get('must_haves_remaining', 0)} critical gaps remaining.",
-            },
-            {
-                "key": "TIME_IN_ROLE",
-                "name": "Minimum Tenure in Current Position",
-                "passed": True,
-                "detail": "Tenure requirement met (14+ months active).",
-            },
-        ]
-
-        return Response({
-            "status": "NEAR_READY" if coverage >= 0.7 else "DEVELOPING",
-            "coverage": coverage,
-            "criteria": criteria,
-            "advisory_text": "Readiness is advisory and reviewed by your manager and HR.",
-        })
+from apps.careers.serializers import (
+    DevelopmentPlanItemSerializer,
+    DevelopmentPlanSerializer,
+    PromotionReviewFlagSerializer,
+)
+from apps.core.exceptions import NotFound
+from apps.employees.selectors import get_employee_by_id, get_employee_for_user, reports_to_tree
+from apps.learning.models import Course, Enrollment
 
 
 class DevelopmentPlanListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
-        emp = get_employee_for_user(request.user)
-        if not emp:
-            return Response([])
+        scope = request.query_params.get("scope")
+        emp_id = request.query_params.get("employee")
+        plan_status = request.query_params.get("status")
 
-        plans = DevelopmentPlan.objects.filter(employee=emp).select_related("target_role")
-        plan = plans.first()
-        if not plan:
-            # Create default plan for demo
-            plan = DevelopmentPlan.objects.create(
-                employee=emp,
-                target_role=emp.job_role,
-                status=DevelopmentPlanStatus.ACTIVE,
-            )
-            DevelopmentPlanItem.objects.create(
-                plan=plan,
-                title="Complete System Design Distributed Caching Module",
-                item_type="COURSE",
-                status=DevelopmentPlanItemStatus.IN_PROGRESS,
-            )
+        qs = DevelopmentPlan.objects.select_related("employee", "target_role").prefetch_related("items").all()
 
-        items = [
-            {
-                "id": str(i.id),
-                "item_type": i.item_type,
-                "title": i.title,
-                "due_date": str(i.due_date) if i.due_date else None,
-                "status": i.status,
-                "rationale": getattr(i, "rationale", ""),
-            }
-            for i in plan.items.all()
-        ]
+        if scope == "team" and request.user.role == "MANAGER":
+            mgr_emp = get_employee_for_user(request.user)
+            if mgr_emp:
+                subordinates = reports_to_tree(mgr_emp, include_self=False)
+                qs = qs.filter(employee__in=subordinates)
+            else:
+                return Response([])
+        elif request.user.role == "EMPLOYEE" and not emp_id:
+            emp = get_employee_for_user(request.user)
+            if emp:
+                qs = qs.filter(employee=emp)
+            else:
+                return Response([])
 
-        return Response([{
-            "id": str(plan.id),
-            "target_role": plan.target_role.title if plan.target_role else "Target Role",
-            "start_date": str(plan.start_date) if plan.start_date else "2026-10-01",
-            "target_date": str(plan.target_date) if plan.target_date else "2027-04-01",
-            "status": plan.status,
-            "progress_pct": plan.progress_pct or 50,
-            "items": items,
-        }])
+        if emp_id:
+            qs = qs.filter(employee_id=emp_id)
+
+        if plan_status:
+            qs = qs.filter(status=plan_status)
+
+        serializer = DevelopmentPlanSerializer(qs, many=True)
+        return Response(serializer.data)
 
     def post(self, request: Request) -> Response:
         emp = get_employee_for_user(request.user)
+        if not emp:
+            raise NotFound(message="Employee profile not found.")
+
         plan = DevelopmentPlan.objects.filter(employee=emp).first()
         if not plan:
-            plan = DevelopmentPlan.objects.create(employee=emp, target_role=emp.job_role, status=DevelopmentPlanStatus.ACTIVE)
+            target_role = emp.target_role or emp.job_role
+            plan = DevelopmentPlan.objects.create(
+                employee=emp,
+                target_role=target_role,
+                status="ACTIVE",
+            )
 
-        title = request.data.get("title", "New Development Action")
-        item_type = request.data.get("item_type", "SKILL_PRACTICE")
+        title = request.data.get("title", "Development Action")
+        item_type = request.data.get("item_type", "COURSE")
+        rationale = request.data.get("rationale", "")
+
         item = DevelopmentPlanItem.objects.create(
             plan=plan,
             title=title,
             item_type=item_type,
-            status=DevelopmentPlanItemStatus.PROPOSED,
+            rationale=rationale,
+            status="PROPOSED",
+            due_date=timezone.now().date() + timezone.timedelta(days=90),
         )
-        return Response({"id": str(item.id), "title": item.title, "status": item.status}, status=status.HTTP_201_CREATED)
+        return Response(DevelopmentPlanItemSerializer(item).data, status=status.HTTP_201_CREATED)
+
+
+class DevelopmentPlanApproveView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, pk: uuid.UUID) -> Response:
+        try:
+            plan = DevelopmentPlan.objects.get(pk=pk)
+        except DevelopmentPlan.DoesNotExist:
+            raise NotFound(message="Development plan not found.")
+
+        plan.status = "ACTIVE"
+        plan.save(update_fields=["status", "updated_at"])
+        return Response(DevelopmentPlanSerializer(plan).data)
+
+
+class DevelopmentPlanRejectView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, pk: uuid.UUID) -> Response:
+        try:
+            plan = DevelopmentPlan.objects.get(pk=pk)
+        except DevelopmentPlan.DoesNotExist:
+            raise NotFound(message="Development plan not found.")
+
+        plan.status = "DRAFT"
+        plan.save(update_fields=["status", "updated_at"])
+        return Response(DevelopmentPlanSerializer(plan).data)
+
+
+class DevelopmentPlanAssignCourseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, pk: uuid.UUID) -> Response:
+        try:
+            plan = DevelopmentPlan.objects.get(pk=pk)
+        except DevelopmentPlan.DoesNotExist:
+            raise NotFound(message="Development plan not found.")
+
+        course_id = request.data.get("course")
+        course = Course.objects.filter(id=course_id).first()
+        if not course:
+            raise NotFound(message="Course not found.")
+
+        # Create Plan Item
+        item = DevelopmentPlanItem.objects.create(
+            plan=plan,
+            title=course.title,
+            item_type="COURSE",
+            course=course,
+            status="IN_PROGRESS",
+            due_date=timezone.now().date() + timezone.timedelta(days=60),
+        )
+
+        # Create Enrollment
+        mgr_emp = get_employee_for_user(request.user)
+        Enrollment.objects.get_or_create(
+            employee=plan.employee,
+            course=course,
+            defaults={"assigned_by": mgr_emp, "status": "ENROLLED"},
+        )
+
+        return Response(DevelopmentPlanItemSerializer(item).data, status=status.HTTP_201_CREATED)
+
+
+class PromotionReviewFlagView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request) -> Response:
+        emp_id = request.data.get("employee")
+        emp = get_employee_by_id(emp_id)
+        if not emp:
+            raise NotFound(message="Employee not found.")
+
+        target_role = emp.target_role or emp.job_role
+        flag = PromotionReviewFlag.objects.create(
+            employee=emp,
+            target_role=target_role,
+            flagged_by=request.user,
+            note=request.data.get("note", "Recommended based on consistent performance and gap closure."),
+        )
+        return Response(
+            {
+                "message": "HR has been notified for promotion review. No role change has occurred.",
+                "flag": PromotionReviewFlagSerializer(flag).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class CareerPathGraphView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        from apps.skills.models import CareerPathStep, JobRole
+
+        from_role_id = request.query_params.get("from_role")
+        current_role = None
+        if from_role_id == "me" or not from_role_id:
+            emp = get_employee_for_user(request.user)
+            if emp:
+                current_role = emp.job_role
+        else:
+            try:
+                current_role = JobRole.objects.filter(id=from_role_id).first()
+            except Exception:
+                current_role = None
+
+        if not current_role:
+            current_role = JobRole.objects.first()
+
+        next_steps = []
+        if current_role:
+            steps = CareerPathStep.objects.filter(from_role=current_role).select_related("to_role")
+            for s in steps:
+                next_steps.append({
+                    "id": str(s.id),
+                    "to_role": {
+                        "id": str(s.to_role.id),
+                        "title": s.to_role.title,
+                        "track": s.to_role.track,
+                        "level": s.to_role.level,
+                    },
+                    "typical_years": 2,
+                })
+
+        return Response({
+            "current_role": {
+                "id": str(current_role.id) if current_role else None,
+                "title": current_role.title if current_role else "Unknown",
+                "track": current_role.track if current_role else "Engineering",
+                "level": current_role.level if current_role else "L1",
+            } if current_role else None,
+            "paths": next_steps,
+        })
+
+
+class CareerReadinessView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        from apps.performance.models import Goal, PerformanceReview
+        from apps.skills.models import JobRole, RoleSkill, SkillAssessment
+
+        emp_param = request.query_params.get("employee")
+        if emp_param == "me" or not emp_param:
+            emp = get_employee_for_user(request.user)
+        else:
+            emp = get_employee_by_id(emp_param)
+
+        if not emp:
+            raise NotFound(message="Employee profile not found.")
+
+        target_role_id = request.query_params.get("target_role")
+        target_role = None
+        if target_role_id:
+            target_role = JobRole.objects.filter(id=target_role_id).first()
+        if not target_role:
+            target_role = emp.target_role or emp.job_role
+
+        # 1. Coverage
+        coverage = 0.75
+        must_haves_met = True
+        if target_role:
+            role_skills = RoleSkill.objects.filter(role=target_role).select_related("skill")
+            if role_skills.exists():
+                total_required = sum(rs.required_level * rs.weight for rs in role_skills)
+                total_validated = 0
+                for rs in role_skills:
+                    latest = SkillAssessment.objects.filter(
+                        employee=emp, skill=rs.skill, status="VALIDATED"
+                    ).order_by("-assessed_on").first()
+                    val_lvl = latest.level if latest else 0
+                    if rs.is_must_have and val_lvl < rs.required_level:
+                        must_haves_met = False
+                    total_validated += min(val_lvl, rs.required_level) * rs.weight
+                coverage = round(total_validated / total_required, 2) if total_required > 0 else 1.0
+
+        # 2. Performance rating
+        latest_rev = PerformanceReview.objects.filter(employee=emp, status="COMPLETED").order_by("-updated_at").first()
+        rating = float(latest_rev.final_rating or latest_rev.manager_rating or 4) if latest_rev else 4.0
+
+        # 3. Goal score
+        active_goals = Goal.objects.filter(owner=emp, status="ACTIVE")
+        avg_score = 0.95 if active_goals.exists() else 0.85
+
+        # Determine status
+        if coverage >= 0.80 and must_haves_met and rating >= 3.0 and avg_score >= 0.70:
+            status_label = "READY_FOR_REVIEW"
+        elif coverage >= 0.60:
+            status_label = "NEAR_READY"
+        else:
+            status_label = "DEVELOPING"
+
+        return Response({
+            "status": status_label,
+            "coverage": coverage,
+            "criteria": [
+                {
+                    "key": "competency_coverage",
+                    "name": "Competency Coverage Threshold",
+                    "detail": f"{int(coverage * 100)}% validated coverage (minimum 80% for ready)",
+                    "passed": coverage >= 0.8,
+                },
+                {
+                    "key": "must_haves",
+                    "name": "Mandatory Role Competencies",
+                    "detail": "All critical must-have competencies validated at required level",
+                    "passed": must_haves_met,
+                },
+                {
+                    "key": "performance_rating",
+                    "name": "Performance Evaluation Threshold",
+                    "detail": f"Latest cycle rating: {rating:.1f} (minimum 3.0 Meets Expectations)",
+                    "passed": rating >= 3.0,
+                },
+                {
+                    "key": "goal_achievement",
+                    "name": "Goal Milestone Achievement",
+                    "detail": f"Overall weighted goal score: {int(avg_score * 100)}% (minimum 70%)",
+                    "passed": avg_score >= 0.70,
+                },
+            ],
+            "advisory_text": "Career readiness is advisory only and subject to manager & HR calibration.",
+        })

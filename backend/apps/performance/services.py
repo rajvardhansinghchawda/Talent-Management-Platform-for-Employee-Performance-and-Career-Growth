@@ -563,7 +563,11 @@ def get_employee_goals_score(employee: Employee, cycle_id: uuid.UUID | str | Non
     """Compute weighted goal score with per-goal breakdown and org cap applied."""
     qs = Goal.objects.filter(owner=employee)
     if cycle_id:
-        qs = qs.filter(cycle_id=cycle_id)
+        cycle_qs = qs.filter(cycle_id=cycle_id)
+        if cycle_qs.exists():
+            qs = cycle_qs
+        else:
+            qs = qs.filter(cycle__isnull=True)
 
     goals = list(qs)
     cap = get_goal_score_cap()
@@ -917,6 +921,37 @@ def propose_calibration(
     )
 
     return review
+
+
+@transaction.atomic
+def finalize_calibration(
+    review: PerformanceReview,
+    final_rating: int | None,
+    comment: str,
+    actor: User,
+) -> PerformanceReview:
+    """Finalizes calibration, approves final rating, and transitions review to COMPLETED."""
+    return transition_review(
+        review=review,
+        to_status=ReviewStatus.COMPLETED,
+        actor=actor,
+        data={"final_rating": final_rating, "comment": comment},
+    )
+
+
+@transaction.atomic
+def reopen_dispute(
+    review: PerformanceReview,
+    comment: str,
+    actor: User,
+) -> PerformanceReview:
+    """Reopens a DISPUTED review back to CALIBRATION status."""
+    return transition_review(
+        review=review,
+        to_status=ReviewStatus.CALIBRATION,
+        actor=actor,
+        data={"comment": comment},
+    )
 
 
 @transaction.atomic

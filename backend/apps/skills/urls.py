@@ -15,7 +15,26 @@ urlpatterns = [
     ),
     # Gap Analysis & Employee Skills
     path("skills/gaps/", views.SkillGapAnalysisView.as_view(), name="skill-gap-analysis"),
-    path("employees/me/skills/", views.EmployeeSkillsListView.as_view(), name="employee-skills-list"),
+    path(
+        "employees/me/skills/", views.EmployeeSkillsListView.as_view(), name="employee-skills-list"
+    ),
+    # Skill Assessments / Validation Queue
+    path("skill-assessments/", views.SkillAssessmentListView.as_view(), name="skill-assessments-list"),
+    path(
+        "skill-assessments/<uuid:pk>/validate/",
+        views.SkillAssessmentValidateView.as_view(),
+        name="skill-assessment-validate",
+    ),
+    path(
+        "skill-assessments/<uuid:pk>/reject/",
+        views.SkillAssessmentRejectView.as_view(),
+        name="skill-assessment-reject",
+    ),
+    path(
+        "skill-assessments/bulk-validate/",
+        views.SkillAssessmentBulkValidateView.as_view(),
+        name="skill-assessment-bulk-validate",
+    ),
     # Job Roles
     path("job-roles/", views.JobRoleListCreateView.as_view(), name="job-role-list-create"),
     path("job-roles/<uuid:pk>/", views.JobRoleDetailView.as_view(), name="job-role-detail"),

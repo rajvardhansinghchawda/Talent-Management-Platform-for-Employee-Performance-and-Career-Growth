@@ -73,7 +73,10 @@ export default function ReviewDetailPage() {
         body: JSON.stringify({
           self_rating: overallRating,
           self_comments: selfComments,
-          competencies: competencyRatings,
+          competencies: Object.entries(competencyRatings).map(([name, rating]) => ({
+            name,
+            rating,
+          })),
         }),
       }),
     onSuccess: () => {

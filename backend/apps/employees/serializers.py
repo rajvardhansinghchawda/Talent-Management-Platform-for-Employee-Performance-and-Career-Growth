@@ -134,8 +134,8 @@ class UserEmployeeCreateSerializer(serializers.Serializer):
 
     # Employee profile fields
     employee_code = serializers.CharField(max_length=50)
-    first_name = serializers.CharField(max_length=100)
-    last_name = serializers.CharField(max_length=100)
+    first_name = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
+    last_name = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
     preferred_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
     phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
     location = serializers.CharField(max_length=100, required=False, allow_blank=True)
@@ -150,6 +150,26 @@ class UserEmployeeCreateSerializer(serializers.Serializer):
         queryset=Employee.objects.all(), required=False, allow_null=True
     )
     joining_date = serializers.DateField(required=False, allow_null=True)
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict) and "employee" in data and isinstance(data["employee"], dict):
+            emp_data = data["employee"]
+            data = data.copy() if hasattr(data, "copy") else dict(data)
+            for k, v in emp_data.items():
+                if k not in data or not data[k]:
+                    data[k] = v
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        if not attrs.get("first_name"):
+            pref = attrs.get("preferred_name") or attrs.get("email", "").split("@")[0]
+            parts = pref.split(" ", 1)
+            attrs["first_name"] = parts[0]
+            if len(parts) > 1 and not attrs.get("last_name"):
+                attrs["last_name"] = parts[1]
+            elif not attrs.get("last_name"):
+                attrs["last_name"] = "Employee"
+        return attrs
 
     def validate_email(self, value):
         if User.objects.filter(email=value.lower()).exists():

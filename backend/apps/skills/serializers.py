@@ -142,3 +142,32 @@ class JobRoleCreateUpdateSerializer(serializers.ModelSerializer):
             "min_months_in_role",
             "is_critical",
         ]
+
+
+class SkillAssessmentQueueSerializer(serializers.ModelSerializer):
+    employee_id = serializers.UUIDField(source="employee.id", read_only=True)
+    employee_name = serializers.CharField(source="employee.name", read_only=True)
+    employee_code = serializers.CharField(source="employee.employee_code", read_only=True)
+    department = serializers.CharField(source="employee.department.name", default="", read_only=True)
+    skill_name = serializers.CharField(source="skill.name", read_only=True)
+    skill_category = serializers.CharField(source="skill.category", default="", read_only=True)
+
+    class Meta:
+        model = SkillAssessment
+        fields = [
+            "id",
+            "employee_id",
+            "employee_name",
+            "employee_code",
+            "department",
+            "skill",
+            "skill_name",
+            "skill_category",
+            "level",
+            "source",
+            "status",
+            "evidence_note",
+            "evidence_url",
+            "assessed_on",
+            "created_at",
+        ]

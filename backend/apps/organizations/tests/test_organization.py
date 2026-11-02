@@ -1,7 +1,8 @@
 """Organization and Settings endpoint tests."""
 
-import pytest
 from decimal import Decimal
+
+import pytest
 from rest_framework.test import APIClient
 
 from apps.accounts.models import User

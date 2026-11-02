@@ -11,15 +11,23 @@ import type {
   CalibrationReviewItem,
   Course,
   Department,
+  DevelopmentPlanRecord,
   Employee,
+  FeedbackItem,
+  GoalItem,
   HRDashboardData,
   JobRole,
+  ManagerDashboardData,
+  ManagerTeamMemberOverview,
+  ManagerTeamRosterItem,
+  OneOnOneItem,
   OrganizationSettings,
   ReportJobItem,
   ReportTypeItem,
   ReviewCycle,
   RoleSkill,
   Skill,
+  SkillAssessmentQueueItem,
   User,
 } from "./types";
 
@@ -47,13 +55,34 @@ export class ApiError extends Error {
 
 // In-memory token storage (never localStorage per security rules)
 let inMemoryAccessToken: string | null = null;
+let tokenReadyResolvers: Array<() => void> = [];
 
 export function setAccessToken(token: string | null): void {
   inMemoryAccessToken = token;
+  if (typeof window !== "undefined") {
+    (window as any).__inMemoryAccessToken = token;
+  }
+  if (token) {
+    const resolvers = [...tokenReadyResolvers];
+    tokenReadyResolvers = [];
+    resolvers.forEach((fn) => fn());
+  }
 }
 
 export function getAccessToken(): string | null {
-  return inMemoryAccessToken;
+  return inMemoryAccessToken || (typeof window !== "undefined" ? (window as any).__inMemoryAccessToken : null);
+}
+
+export async function waitForToken(timeoutMs: number = 2000): Promise<string | null> {
+  const current = getAccessToken();
+  if (current) return current;
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(getAccessToken()), timeoutMs);
+    tokenReadyResolvers.push(() => {
+      clearTimeout(timer);
+      resolve(getAccessToken());
+    });
+  });
 }
 
 let isRefreshing = false;
@@ -81,14 +110,20 @@ export async function fetchApi<T>(
 ): Promise<T> {
   const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 
+  if (!getAccessToken() && !endpoint.includes("/auth/login") && !endpoint.includes("/auth/password/reset") && typeof window !== "undefined") {
+    await waitForToken(2000);
+  }
+
+  const token = getAccessToken();
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json",
     ...((options.headers as Record<string, string>) || {}),
   };
 
-  if (inMemoryAccessToken && !headers["Authorization"]) {
-    headers["Authorization"] = `Bearer ${inMemoryAccessToken}`;
+  if (token && !headers["Authorization"]) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
   // If body is FormData, delete Content-Type so browser sets multi-part boundary
@@ -196,6 +231,188 @@ export const api = {
 
   dashboard: {
     getHrDashboard: () => fetchApi<HRDashboardData>("/dashboards/hr/"),
+  },
+
+  manager: {
+    getDashboard: () => fetchApi<ManagerDashboardData>("/dashboards/manager/"),
+    getTeam: (params?: { q?: string; role?: string; review_status?: string }) => {
+      const search = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => {
+          if (v) search.append(k, v);
+        });
+      }
+      return fetchApi<ManagerTeamRosterItem[]>(`/manager/team/?${search.toString()}`);
+    },
+    getTeamMemberOverview: (id: string) =>
+      fetchApi<ManagerTeamMemberOverview>(`/manager/team/${id}/overview/`),
+    getGoals: (params?: { scope?: string; employee?: string; cycle?: string; status?: string; q?: string }) => {
+      const search = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => {
+          if (v) search.append(k, v);
+        });
+      }
+      return fetchApi<GoalItem[]>(`/goals/?${search.toString()}`);
+    },
+    approveGoal: (id: string, comment?: string) =>
+      fetchApi<{ status: string }>(`/goals/${id}/approve/`, {
+        method: "POST",
+        body: JSON.stringify({ comment }),
+      }),
+    rejectGoal: (id: string, comment: string) =>
+      fetchApi<{ status: string }>(`/goals/${id}/reject/`, {
+        method: "POST",
+        body: JSON.stringify({ comment }),
+      }),
+    assignGoal: (data: {
+      employee: string;
+      title: string;
+      goal_type: string;
+      direction: string;
+      weight: number;
+      target_value: number;
+      due_date?: string;
+    }) =>
+      fetchApi<GoalItem>("/goals/", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    getGoalAlignment: (params?: { scope?: string; cycle?: string }) => {
+      const search = new URLSearchParams(params || {}).toString();
+      return fetchApi<unknown[]>(`/goals/alignment/?${search}`);
+    },
+    getReviews: (params?: { scope?: string; employee?: string; cycle?: string; status?: string; q?: string }) => {
+      const search = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => {
+          if (v) search.append(k, v);
+        });
+      }
+      return fetchApi<unknown[]>(`/reviews/?${search.toString()}`);
+    },
+    getReviewDetail: (id: string) => fetchApi<Record<string, unknown>>(`/reviews/${id}/`),
+    getReviewContext: (id: string) => fetchApi<Record<string, unknown>>(`/reviews/${id}/context/`),
+    saveReviewDraft: (id: string, draft: Record<string, unknown>) =>
+      fetchApi<Record<string, unknown>>(`/reviews/${id}/manager-review/draft/`, {
+        method: "PUT",
+        body: JSON.stringify({ draft }),
+      }),
+    submitReview: (id: string, data: {
+      overall_rating: number;
+      comments: string;
+      competency_ratings?: Array<{ competency_id: string; rating: number; comment?: string }>;
+      development_recommendations?: Array<{ text: string; skill?: string }>;
+    }) =>
+      fetchApi<Record<string, unknown>>(`/reviews/${id}/manager-review/`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    remindReviews: (review_ids: string[]) =>
+      fetchApi<{ reminders_sent: number }>("/reviews/remind/", {
+        method: "POST",
+        body: JSON.stringify({ review_ids }),
+      }),
+    getSkillValidationQueue: (params?: { scope?: string; status?: string; employee?: string; skill?: string }) => {
+      const search = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => {
+          if (v) search.append(k, v);
+        });
+      }
+      return fetchApi<SkillAssessmentQueueItem[]>(`/skill-assessments/?${search.toString()}`);
+    },
+    validateSkill: (id: string, data: { adjusted_level?: number; note?: string }) =>
+      fetchApi<{ status: string; level: number }>(`/skill-assessments/${id}/validate/`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    rejectSkill: (id: string, reason: string) =>
+      fetchApi<{ status: string; reason: string }>(`/skill-assessments/${id}/reject/`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    bulkValidateSkills: (ids: string[]) =>
+      fetchApi<{ validated_count: number }>("/skill-assessments/bulk-validate/", {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      }),
+    getFeedback: (params?: { scope?: string; to_employee?: string }) => {
+      const search = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => {
+          if (v) search.append(k, v);
+        });
+      }
+      return fetchApi<FeedbackItem[]>(`/feedback/?${search.toString()}`);
+    },
+    giveFeedback: (data: { to_employee: string; feedback_type: string; content: string; visibility: string }) =>
+      fetchApi<FeedbackItem>("/feedback/", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    giveRecognition: (data: { to_employee: string; message: string }) =>
+      fetchApi<Record<string, unknown>>("/recognitions/", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    getFeedbackVisibilityOptions: () =>
+      fetchApi<Array<{ value: string; label: string; help: string }>>("/feedback/visibility-options/"),
+    getOneOnOnes: (params?: { scope?: string; when?: "upcoming" | "past" }) => {
+      const search = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => {
+          if (v) search.append(k, v);
+        });
+      }
+      return fetchApi<OneOnOneItem[]>(`/one-on-ones/?${search.toString()}`);
+    },
+    scheduleOneOnOne: (data: { employee: string; scheduled_at: string; shared_notes?: string; private_notes?: string }) =>
+      fetchApi<OneOnOneItem>("/one-on-ones/", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    updateNotes: (id: string, data: { shared_notes?: string; private_notes?: string; status?: string }) =>
+      fetchApi<OneOnOneItem>(`/one-on-ones/${id}/`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    addActionItem: (meetingId: string, data: { title: string; owner?: string; due_date?: string }) =>
+      fetchApi<Record<string, unknown>>(`/one-on-ones/${meetingId}/action-items/`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    getDevelopmentPlans: (params?: { scope?: string; employee?: string; status?: string }) => {
+      const search = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([k, v]) => {
+          if (v) search.append(k, v);
+        });
+      }
+      return fetchApi<DevelopmentPlanRecord[]>(`/development-plans/?${search.toString()}`);
+    },
+    approveDevelopmentPlan: (id: string) =>
+      fetchApi<DevelopmentPlanRecord>(`/development-plans/${id}/approve/`, {
+        method: "POST",
+      }),
+    rejectDevelopmentPlan: (id: string) =>
+      fetchApi<DevelopmentPlanRecord>(`/development-plans/${id}/reject/`, {
+        method: "POST",
+      }),
+    assignCourseToPlan: (planId: string, courseId: string) =>
+      fetchApi<Record<string, unknown>>(`/development-plans/${planId}/assign-course/`, {
+        method: "POST",
+        body: JSON.stringify({ course: courseId }),
+      }),
+    flagPromotion: (data: { employee: string; note?: string }) =>
+      fetchApi<{ message: string; flag: Record<string, unknown> }>("/careers/promotion-flags/", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    getTeamGoalDistribution: () => fetchApi<{ buckets: Array<{ label: string; count: number }> }>("/analytics/team/goal-progress-distribution/"),
+    getTeamRatingTrend: () => fetchApi<Array<{ cycle_id: string; cycle_name: string; avg_rating: number }>>("/analytics/team/rating-trend/"),
+    getTeamSkillHeatmap: () => fetchApi<{ skills: string[]; rows: Array<{ employee_name: string; levels: number[] }> }>("/analytics/team/skill-heatmap/"),
+    getTeamTrainingCompletion: () => fetchApi<{ completed: number; in_progress: number; enrolled: number; total: number; completion_pct: number }>("/analytics/team/training-completion/"),
   },
 
   employees: {

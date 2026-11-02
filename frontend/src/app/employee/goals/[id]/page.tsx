@@ -91,6 +91,21 @@ export default function GoalDetailPage() {
     },
   });
 
+  const submitMutation = useMutation({
+    mutationFn: () =>
+      fetchApi(`/goals/${id}/submit/`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["goal-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["employee-dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-goals"] });
+    },
+    onError: (err: any) => {
+      setFormError(err.message || "Failed to submit goal for approval.");
+    },
+  });
+
   if (isLoading) return <LoadingState rows={8} />;
   if (error || !goal) {
     return (
@@ -136,6 +151,18 @@ export default function GoalDetailPage() {
             <span>Due: <strong className="text-slate-700">{formatDate(goal.due_date)}</strong></span>
           </div>
         </div>
+
+        {goal.status === "DRAFT" && (
+          <Button
+            size="sm"
+            onClick={() => submitMutation.mutate()}
+            disabled={submitMutation.isPending}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs self-start md:self-auto"
+          >
+            <Send className="w-3.5 h-3.5 mr-1.5" />
+            {submitMutation.isPending ? "Submitting..." : "Submit for Approval"}
+          </Button>
+        )}
       </div>
 
       {/* Two Column Layout */}

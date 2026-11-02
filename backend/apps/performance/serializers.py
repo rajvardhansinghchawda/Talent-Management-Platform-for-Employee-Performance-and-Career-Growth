@@ -323,13 +323,27 @@ class CalibrationReviewItemSerializer(serializers.ModelSerializer):
 
 
 class CalibrationProposalSerializer(serializers.Serializer):
-    calibrated_rating = serializers.IntegerField(min_value=1, max_value=5)
+    calibrated_rating = serializers.IntegerField(min_value=1, max_value=5, required=False)
+    rating = serializers.IntegerField(min_value=1, max_value=5, required=False)
     comment = serializers.CharField(min_length=1)
+
+    def validate(self, attrs):
+        if "rating" in attrs and "calibrated_rating" not in attrs:
+            attrs["calibrated_rating"] = attrs.pop("rating")
+        elif "calibrated_rating" not in attrs:
+            raise serializers.ValidationError({"calibrated_rating": "This field is required."})
+        return attrs
 
 
 class CalibrationFinalizeSerializer(serializers.Serializer):
     final_rating = serializers.IntegerField(min_value=1, max_value=5, required=False)
-    comment = serializers.CharField(required=False, allow_blank=True)
+    rating = serializers.IntegerField(min_value=1, max_value=5, required=False)
+    comment = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):
+        if "rating" in attrs and "final_rating" not in attrs:
+            attrs["final_rating"] = attrs.pop("rating")
+        return attrs
 
 
 class HRDashboardSerializer(serializers.Serializer):
@@ -483,9 +497,14 @@ class PerformanceReviewDetailSerializer(serializers.ModelSerializer):
 class SelfAssessmentSubmitSerializer(serializers.Serializer):
     self_rating = serializers.IntegerField(min_value=1, max_value=5)
     self_comments = serializers.CharField(required=False, allow_blank=True, default="")
-    competencies = serializers.ListField(
-        child=serializers.DictField(), required=False, default=list
-    )
+    competencies = serializers.JSONField(required=False, default=list)
+
+    def validate_competencies(self, value):
+        if isinstance(value, dict):
+            return [{"name": k, "rating": v} for k, v in value.items()]
+        elif isinstance(value, list):
+            return value
+        raise serializers.ValidationError("Competencies must be a list or key-value object.")
 
 
 class SelfAssessmentDraftSerializer(serializers.Serializer):
@@ -493,14 +512,34 @@ class SelfAssessmentDraftSerializer(serializers.Serializer):
 
 
 class ManagerReviewSubmitSerializer(serializers.Serializer):
-    manager_rating = serializers.IntegerField(min_value=1, max_value=5)
+    manager_rating = serializers.IntegerField(min_value=1, max_value=5, required=False)
+    overall_rating = serializers.IntegerField(min_value=1, max_value=5, required=False)
     manager_comments = serializers.CharField(required=False, allow_blank=True, default="")
-    competencies = serializers.ListField(
-        child=serializers.DictField(), required=False, default=list
-    )
-    development_recommendations = serializers.ListField(
-        child=serializers.CharField(), required=False, default=list
-    )
+    comments = serializers.CharField(required=False, allow_blank=True, default="")
+    competencies = serializers.JSONField(required=False, default=list)
+    development_recommendations = serializers.JSONField(required=False, default=list)
+
+    def validate_competencies(self, value):
+        if isinstance(value, dict):
+            return [{"name": k, "rating": v} for k, v in value.items()]
+        elif isinstance(value, list):
+            return value
+        raise serializers.ValidationError("Competencies must be a list or key-value object.")
+
+    def validate(self, attrs):
+        if "overall_rating" in attrs and "manager_rating" not in attrs:
+            attrs["manager_rating"] = attrs.pop("overall_rating")
+        elif "manager_rating" not in attrs:
+            raise serializers.ValidationError({"manager_rating": "This field is required."})
+
+        if "comments" in attrs and not attrs.get("manager_comments"):
+            attrs["manager_comments"] = attrs.pop("comments")
+
+        dev_rec = attrs.get("development_recommendations")
+        if isinstance(dev_rec, str):
+            attrs["development_recommendations"] = [dev_rec] if dev_rec.strip() else []
+
+        return attrs
 
 
 class ManagerReviewDraftSerializer(serializers.Serializer):

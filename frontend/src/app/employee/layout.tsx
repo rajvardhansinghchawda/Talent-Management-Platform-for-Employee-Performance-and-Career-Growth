@@ -14,7 +14,7 @@ export default function EmployeeLayout({
 }) {
   const { user, loading } = useAuth();
 
-  if (loading || !user) {
+  if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center space-y-4">
@@ -22,6 +22,28 @@ export default function EmployeeLayout({
             TP
           </div>
           <p className="text-sm text-slate-500 font-medium">Connecting to TalentPulse backend...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50 p-6">
+        <div className="flex flex-col items-center space-y-4 max-w-md text-center p-8 bg-white rounded-xl border border-slate-200 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center">
+            TP
+          </div>
+          <h2 className="text-base font-bold text-slate-900">Backend Connection Error</h2>
+          <p className="text-xs text-slate-500">
+            Could not authenticate with the TalentPulse backend. Please verify that the backend is running on http://127.0.0.1:8000.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 rounded-md bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors"
+          >
+            Retry Connection
+          </button>
         </div>
       </div>
     );

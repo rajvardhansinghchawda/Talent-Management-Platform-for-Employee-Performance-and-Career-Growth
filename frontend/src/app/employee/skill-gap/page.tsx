@@ -56,6 +56,7 @@ export default function SkillGapPage() {
     queryKey: ["all-job-roles"],
     queryFn: () => api.jobRoles.list(),
   });
+  const roleList = Array.isArray(roles) ? roles : (roles as any)?.results || [];
 
   const {
     data: gapAnalysis,
@@ -131,7 +132,7 @@ export default function SkillGapPage() {
               onChange={(e) => setSelectedTargetRole(e.target.value)}
               className="w-full h-9 px-3 rounded-md border border-slate-300 bg-white text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600"
             >
-              {roles?.map((r) => (
+              {roleList.map((r: any) => (
                 <option key={r.id} value={r.id}>
                   {r.title} ({r.track} - L{r.level})
                 </option>

@@ -8,7 +8,21 @@ urlpatterns = [
     # Dashboard
     path("dashboards/hr/", views.HRDashboardView.as_view(), name="hr-dashboard"),
     path("dashboards/employee/", views.EmployeeDashboardView.as_view(), name="employee-dashboard"),
-    path("dashboards/employee/reviews/", views.EmployeeReviewsListView.as_view(), name="employee-reviews-list"),
+    path(
+        "dashboards/executive/", views.ExecutiveDashboardView.as_view(), name="executive-dashboard"
+    ),
+    path("dashboards/manager/", views.ManagerDashboardView.as_view(), name="manager-dashboard"),
+    path("manager/team/", views.ManagerTeamRosterView.as_view(), name="manager-team-roster"),
+    path(
+        "manager/team/<uuid:pk>/overview/",
+        views.ManagerTeamMemberOverviewView.as_view(),
+        name="manager-team-member-overview",
+    ),
+    path(
+        "dashboards/employee/reviews/",
+        views.EmployeeReviewsListView.as_view(),
+        name="employee-reviews-list",
+    ),
     # Review Cycles
     path("review-cycles/", views.ReviewCycleListView.as_view(), name="review-cycles-list"),
     path(

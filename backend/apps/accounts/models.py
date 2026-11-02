@@ -67,7 +67,9 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def get_short_name(self) -> str:
         if hasattr(self, "employee_profile"):
-            return getattr(self.employee_profile, "preferred_name", None) or self.employee_profile.name
+            return (
+                getattr(self.employee_profile, "preferred_name", None) or self.employee_profile.name
+            )
         return self.email
 
     @property

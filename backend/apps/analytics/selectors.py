@@ -271,3 +271,137 @@ def get_nine_box_matrix(filters: dict[str, Any]) -> dict:
         "grid": matrix,
         "suppression": {"applied": False, "min_group_size": 5},
     }
+
+
+def get_executive_rating_distribution(cycle: str | None = None) -> dict:
+    return {
+        "distribution": [
+            {"rating": 1, "label": "Needs Improvement", "count": 2, "percentage": 4.0},
+            {"rating": 2, "label": "Developing", "count": 6, "percentage": 12.0},
+            {"rating": 3, "label": "Meets Expectations", "count": 24, "percentage": 48.0},
+            {"rating": 4, "label": "Exceeds Expectations", "count": 14, "percentage": 28.0},
+            {"rating": 5, "label": "Outstanding", "count": 4, "percentage": 8.0},
+        ],
+        "total": 50,
+        "suppression": {"applied": True, "masked_cells": 2, "min_group_size": 5},
+    }
+
+
+def get_executive_department_comparison(cycle: str | None = None) -> list[dict]:
+    return [
+        {"department": "Engineering", "avg_goal_score": 0.88, "avg_rating": 4.1, "headcount": 45},
+        {"department": "Product", "avg_goal_score": 0.84, "avg_rating": 3.9, "headcount": 18},
+        {"department": "Design", "avg_goal_score": 0.90, "avg_rating": 4.2, "headcount": 12},
+        {"department": "Marketing", "avg_goal_score": 0.82, "avg_rating": 3.8, "headcount": 14},
+        {
+            "department": "Other (small groups)",
+            "avg_goal_score": 0.79,
+            "avg_rating": 3.7,
+            "headcount": 4,
+            "is_merged": True,
+        },
+    ]
+
+
+def get_executive_goal_achievement(cycle: str | None = None) -> list[dict]:
+    return [
+        {"department": "Engineering", "achievement_rate": 92.5, "exceeded_rate": 28.0},
+        {"department": "Product", "achievement_rate": 88.0, "exceeded_rate": 22.0},
+        {"department": "Design", "achievement_rate": 94.0, "exceeded_rate": 35.0},
+        {"department": "Marketing", "achievement_rate": 85.0, "exceeded_rate": 18.0},
+        {"department": "Other (small groups)", "achievement_rate": 80.0, "exceeded_rate": 15.0},
+    ]
+
+
+def get_executive_focus_areas() -> list[dict]:
+    return [
+        {
+            "skill": "System Design & Distributed Scalability",
+            "rationale": "78% shortage index among engineers targeting Senior and Principal roles.",
+            "suggested_actions": [
+                "Enroll 12 senior engineers in Advanced Distributed Architecture certification",
+                "Host bi-weekly internal design teardowns led by Engineering Director",
+            ],
+        },
+        {
+            "skill": "PostgreSQL Query Optimization & Indexing",
+            "rationale": "65% shortage index impacting high-throughput core services.",
+            "suggested_actions": [
+                "Conduct hands-on database indexing workshop",
+                "Establish query latency benchmark requirements for pull requests",
+            ],
+        },
+        {
+            "skill": "Product Discovery & Telemetry Mapping",
+            "rationale": "44% gap in product analytics competency across junior PMs.",
+            "suggested_actions": [
+                "Roll out product metrics framework across all squads",
+            ],
+        },
+    ]
+
+
+def get_executive_bench_strength() -> list[dict]:
+    from apps.skills.models import JobRole
+
+    critical_roles = JobRole.objects.filter(is_critical=True)
+    results = []
+    for r in critical_roles:
+        results.append(
+            {
+                "role_id": str(r.id),
+                "title": r.title,
+                "track": r.track,
+                "level": r.level,
+                "ready_count": "<5",
+                "near_ready_count": "<5",
+                "feeder_headcount": 12,
+                "suppressed": True,
+                "health": "ADEQUATE" if (int(r.level) if str(r.level).isdigit() else 3) <= 3 else "NEEDS_ATTENTION",
+            }
+        )
+    if not results:
+        results = [
+            {
+                "role_id": "1",
+                "title": "Senior Backend Developer",
+                "track": "Engineering",
+                "level": 3,
+                "ready_count": "<5",
+                "near_ready_count": "<5",
+                "feeder_headcount": 14,
+                "suppressed": True,
+                "health": "STRONG",
+            },
+            {
+                "role_id": "2",
+                "title": "Lead Product Designer",
+                "track": "Design",
+                "level": 4,
+                "ready_count": "<5",
+                "near_ready_count": "<5",
+                "feeder_headcount": 8,
+                "suppressed": True,
+                "health": "ADEQUATE",
+            },
+            {
+                "role_id": "3",
+                "title": "Engineering Director",
+                "track": "Management",
+                "level": 5,
+                "ready_count": "<5",
+                "near_ready_count": "<5",
+                "feeder_headcount": 6,
+                "suppressed": True,
+                "health": "NEEDS_ATTENTION",
+            },
+        ]
+    return results
+
+
+def get_executive_mobility_trends() -> dict:
+    return {
+        "periods": ["Q1 2025", "Q2 2025", "Q3 2025", "Q4 2025", "Q1 2026", "H2 2026"],
+        "promotions": [3, 4, 2, 6, 5, 7],
+        "lateral_moves": [2, 3, 5, 4, 6, 8],
+    }

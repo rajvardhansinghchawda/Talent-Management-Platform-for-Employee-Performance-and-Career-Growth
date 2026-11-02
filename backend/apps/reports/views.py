@@ -30,7 +30,7 @@ class ReportTypesListView(APIView):
 
 
 class ReportJobListView(APIView):
-    permission_classes = [IsAuthenticated, HasRole.hr_admin()]
+    permission_classes = [IsAuthenticated, HasRole.executive()]
     pagination_class = StandardPagination
 
     def get(self, request: Request) -> Response:
@@ -77,3 +77,38 @@ class ReportJobRetryView(APIView):
         job.finished_at = timezone.now()
         job.save()
         return Response(ReportJobSerializer(job).data)
+
+
+class ExecutiveReportsCatalogView(APIView):
+    permission_classes = [IsAuthenticated, HasRole.executive()]
+
+    def get(self, request: Request) -> Response:
+        catalog = [
+            {
+                "type": "EXECUTIVE_PERFORMANCE_SUMMARY",
+                "name": "Executive Performance Summary",
+                "description": "High-level goal scores, rating distributions, and cross-department benchmarks.",
+                "formats": ["PDF", "CSV"],
+            },
+            {
+                "type": "SUCCESSION_BENCH_DEPTH",
+                "name": "Succession & Bench Depth Analysis",
+                "description": "Readiness pipeline coverage, critical role coverage, and risk indicators.",
+                "formats": ["PDF", "CSV"],
+            },
+            {
+                "type": "WORKFORCE_SKILL_HEALTH",
+                "name": "Workforce Skill Health & Shortages",
+                "description": "Organizational skill shortages, training effectiveness, and strategic focus areas.",
+                "formats": ["PDF"],
+            },
+        ]
+        return Response(
+            {
+                "catalog": catalog,
+                "scheduled_reports": {
+                    "available": False,
+                    "message": "Automated schedule dispatch coming in Q1 2027.",
+                },
+            }
+        )

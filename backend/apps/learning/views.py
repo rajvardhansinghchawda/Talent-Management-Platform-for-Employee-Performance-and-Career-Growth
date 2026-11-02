@@ -19,8 +19,10 @@ from apps.learning.serializers import (
 
 
 class CourseListCreateView(APIView):
-    permission_classes = [IsAuthenticated, HasRole.hr_admin()]
-
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [HasRole.hr_admin()]
+        return [IsAuthenticated()]
     def get(self, request: Request) -> Response:
         q = request.query_params.get("q")
         difficulty = request.query_params.get("difficulty")
@@ -48,8 +50,10 @@ class CourseListCreateView(APIView):
 
 
 class CourseDetailView(APIView):
-    permission_classes = [IsAuthenticated, HasRole.hr_admin()]
-
+    def get_permissions(self):
+        if self.request.method in ("PATCH", "PUT", "DELETE"):
+            return [HasRole.hr_admin()]
+        return [IsAuthenticated()]
     def get(self, request: Request, pk: uuid.UUID) -> Response:
         course = selectors.get_course_by_id(pk)
         return Response(CourseDetailSerializer(course).data)
@@ -97,23 +101,25 @@ class LearningRecommendationsView(APIView):
                 for cs in c.skill_mappings.all()
             ]
             primary_skill = skills_list[0]["name"] if skills_list else "Software Engineering"
-            recommendations.append({
-                "id": str(c.id),
-                "course": {
+            recommendations.append(
+                {
                     "id": str(c.id),
-                    "title": c.title,
-                    "provider": c.provider,
-                    "duration_hours": float(c.duration_hours),
-                    "difficulty": c.difficulty,
-                    "format": c.format,
-                    "skills": skills_list,
-                },
-                "skill": {"name": primary_skill},
-                "reason": f"Closes key skill gaps for Senior Role in {primary_skill}.",
-                "score": 92,
-                "is_enrolled": bool(enrollment),
-                "enrollment_id": str(enrollment.id) if enrollment else None,
-            })
+                    "course": {
+                        "id": str(c.id),
+                        "title": c.title,
+                        "provider": c.provider,
+                        "duration_hours": float(c.duration_hours),
+                        "difficulty": c.difficulty,
+                        "format": c.format,
+                        "skills": skills_list,
+                    },
+                    "skill": {"name": primary_skill},
+                    "reason": f"Closes key skill gaps for Senior Role in {primary_skill}.",
+                    "score": 92,
+                    "is_enrolled": bool(enrollment),
+                    "enrollment_id": str(enrollment.id) if enrollment else None,
+                }
+            )
         return Response(recommendations)
 
 
@@ -164,4 +170,6 @@ class EnrollmentListCreateView(APIView):
             course=course,
             defaults={"status": EnrollmentStatus.ENROLLED},
         )
-        return Response({"id": str(enrollment.id), "status": enrollment.status}, status=status.HTTP_201_CREATED)
+        return Response(
+            {"id": str(enrollment.id), "status": enrollment.status}, status=status.HTTP_201_CREATED
+        )

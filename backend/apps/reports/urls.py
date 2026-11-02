@@ -13,4 +13,5 @@ urlpatterns = [
         views.ReportJobRetryView.as_view(),
         name="report-job-retry",
     ),
+    path("reports/catalog/", views.ExecutiveReportsCatalogView.as_view(), name="reports-catalog"),
 ]
