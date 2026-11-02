@@ -98,7 +98,9 @@ Talent Management Platform for Employee Performance and Career Growth: A multi-p
 
 **Git**
 - Branch: `master`
-- Status: Staged and verified
+- Commit: `5cff046` ("feat: run all services via docker compose and add Next.js frontend container")
+- Push: None (no remote configured)
+- Status: Clean working tree
 
 ---
 
