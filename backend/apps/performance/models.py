@@ -265,3 +265,29 @@ class ReviewCalibrationEntry(BaseModel):
     class Meta:
         db_table = "performance_calibrationentry"
         ordering = ["created_at"]
+
+
+class ReviewCompetencyRating(BaseModel):
+    """Competency rating within a performance review."""
+
+    review = models.ForeignKey(
+        PerformanceReview, on_delete=models.CASCADE, related_name="competency_ratings"
+    )
+    skill = models.ForeignKey(
+        "skills.Skill",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="review_ratings",
+    )
+    competency_name = models.CharField(max_length=255)
+    self_rating = models.PositiveSmallIntegerField(null=True, blank=True)
+    manager_rating = models.PositiveSmallIntegerField(null=True, blank=True)
+    comment = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "performance_competencyrating"
+        ordering = ["competency_name"]
+
+    def __str__(self) -> str:
+        return f"{self.review} — {self.competency_name}"

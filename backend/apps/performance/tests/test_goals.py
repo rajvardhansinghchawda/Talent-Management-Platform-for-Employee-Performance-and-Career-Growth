@@ -43,12 +43,12 @@ def hr_user(db):
         email="hr@acme.com",
         password="Password123!",
         role=UserRole.HR_ADMIN,
-        first_name="Helen",
-        last_name="HR",
     )
     Employee.objects.create(
         user=user,
         employee_code="HR001",
+        first_name="Helen",
+        last_name="HR",
     )
     return user
 
@@ -59,13 +59,13 @@ def manager_user(db, department):
         email="manager@acme.com",
         password="Password123!",
         role=UserRole.MANAGER,
-        first_name="Marcus",
-        last_name="Manager",
     )
     Employee.objects.create(
         user=user,
         employee_code="MGR001",
         department=department,
+        first_name="Marcus",
+        last_name="Manager",
     )
     return user
 
@@ -76,14 +76,14 @@ def employee_user(db, department, manager_user):
         email="employee@acme.com",
         password="Password123!",
         role=UserRole.EMPLOYEE,
-        first_name="Rahul",
-        last_name="Sharma",
     )
     Employee.objects.create(
         user=user,
         employee_code="EMP001",
         department=department,
         manager=manager_user.employee,
+        first_name="Rahul",
+        last_name="Sharma",
     )
     return user
 
@@ -94,13 +94,13 @@ def other_employee_user(db, department):
         email="other@acme.com",
         password="Password123!",
         role=UserRole.EMPLOYEE,
-        first_name="Alice",
-        last_name="Smith",
     )
     Employee.objects.create(
         user=user,
         employee_code="EMP002",
         department=department,
+        first_name="Alice",
+        last_name="Smith",
     )
     return user
 

@@ -31,6 +31,18 @@ def custom_exception_handler(exc, context) -> Response | None:
             detail=exc.message_dict if hasattr(exc, "message_dict") else exc.messages
         )
 
+    # Handle domain-level exceptions
+    if isinstance(exc, DomainException):
+        code = getattr(exc, "default_code", "domain_error")
+        if exc.details and isinstance(exc.details, dict) and "code" in exc.details:
+            code = exc.details["code"]
+        return _build_error_response(
+            code=code,
+            message=exc.message,
+            details=exc.details,
+            status_code=exc.status_code,
+        )
+
     # Let DRF process it first to get the response
     response = drf_exception_handler(exc, context)
 
@@ -109,9 +121,26 @@ class DomainException(Exception):
     default_code = "domain_error"
     default_message = "A domain error occurred."
 
-    def __init__(self, message: str | None = None, details: dict | None = None):
+    def __init__(
+        self,
+        message: str | None = None,
+        details: dict | None = None,
+        code: str | None = None,
+        status_code: int | None = None,
+        *args,
+        **kwargs,
+    ):
         self.message = message or self.default_message
-        self.details = details
+        self.details = details or {}
+        if status_code is not None:
+            self.status_code = status_code
+        if code:
+            self.code = code
+            if isinstance(self.details, dict) and "code" not in self.details:
+                self.details["code"] = code
+        else:
+            self.code = getattr(self, "default_code", "domain_error")
+        super().__init__(self.message, *args)
 
 
 class StateConflict(DomainException):

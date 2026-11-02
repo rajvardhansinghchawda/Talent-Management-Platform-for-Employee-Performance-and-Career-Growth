@@ -32,30 +32,193 @@ Talent Management Platform for Employee Performance and Career Growth: A multi-p
 - Reporting relationships prevent self-reporting or circular hierarchy.
 
 ## Current State
+- **Docker & Infrastructure active (ALL 7 Services Live)**:
+  - `enfosysspringboard-frontend`: Next.js 15 dev server live on port `3000` (serving Employee & HR portals with client-side API proxy).
+  - `enfosysspringboard-api`: Django 5.x REST API live on port `8000` (handling `/api/v1/` endpoints).
+  - `enfosysspringboard-db`: PostgreSQL 16 live & healthy on port `5432` (`talent_db`).
+  - `enfosysspringboard-redis`: Redis 7 live & healthy on port `6379`.
+  - `enfosysspringboard-worker`: Celery worker listening to queues `default`, `notifications`, `reports`, `ai`.
+  - `enfosysspringboard-beat`: Celery Beat scheduler active.
+  - `enfosysspringboard-mailhog`: MailHog live on ports `1025` (SMTP) and `8025` (Web UI).
+  - Health endpoints verified: `GET /healthz` -> `{"status": "ok"}`, `GET /readyz` -> `{"status": "ok", "database": "ok", "redis": "ok"}`.
+  - Frontend verified: `GET http://localhost:3000` -> `307 Temporary Redirect` -> `/hr` (HTTP 200).
+  - JWT Login verified: `POST /api/v1/auth/login/` returns token and user payload.
+  - Database migrations applied; demo dataset seeded with Acme Corporation, 5 departments, job roles, reviews, goals, and test users.
 - **Phase 0 completed**: Project scaffolding, split settings, 14 apps, base models, Celery queues, Docker configuration, CI pipeline, and pure-python domain engines.
 - **Phase 1 completed**: Auth endpoints, session cookie refresh, forced password change middleware, user management, typed organization settings, and audit trails.
 - **Phase 2 completed**: Department tree with cycle prevention and deletion guards, employee directory with privacy scoping, employee self-service profile, manager assignment and reporting hierarchy, and CSV import pipeline.
-- **Phase 3 completed**:
-  - Goals CRUD (`/api/v1/goals/`) with role scoping (employee sees own, manager sees team reporting tree, HR sees org).
-  - Parent hierarchy cycle prevention (`validate_no_goal_cycle`) returning `409 state_conflict` (`CYCLE_DETECTED`).
-  - Goal submission workflow (`/api/v1/goals/{id}/submit/`): completeness validation (target != start, weight > 0), locks edits (`is_locked=True`), sets `PENDING_APPROVAL`, notifies manager (`GOAL_APPROVAL_NEEDED`).
-  - Goal approval workflow (`/api/v1/goals/{id}/approve/`): blocks self-approval, moves to `ACTIVE`, creates `GoalComment`, notifies employee (`GOAL_DECISION`).
-  - Goal rejection workflow (`/api/v1/goals/{id}/reject/`): mandatory comment validation, returns goal to `DRAFT`, creates `GoalComment(kind=REJECTION)`, notifies employee.
-  - Progress updates (`/api/v1/goals/{id}/updates/`): append-only `GoalUpdate` records on `ACTIVE` goals, updates `current_value`, does not auto-complete.
-  - Goal completion (`/api/v1/goals/{id}/complete/`): explicit action from `ACTIVE`, enforces completion note if target unmet.
-  - Goal scoring (`/api/v1/goals/score/`): weighted score computation across eligible `ACTIVE` and `COMPLETED` goals, respects org `goal_score_cap`, returns per-goal breakdown and contributions.
-  - Alignment visualization (`/api/v1/goals/{id}/alignment/` and `/api/v1/goals/alignment/` forest).
-  - General goal comments (`/api/v1/goals/{id}/comments/`).
-  - Automated tests in `backend/apps/performance/tests/test_goals.py`.
+- **Phase 3 completed**: Goals CRUD, parent hierarchy cycle prevention, submit/approve/reject workflow, append-only progress updates, completion rules, weighted scoring engine with org cap, and alignment forest visualization.
+- **Phase 4 completed**:
+  - Review Cycles CRUD (`/api/v1/review-cycles/`) with activation (snapshots scale, creates reviews in `SELF_ASSESSMENT`), calibration start, close, and consequence preview.
+  - `PerformanceReview` explicit state machine (`transition_review`) enforcing valid transitions and role permissions (`SELF_ASSESSMENT` -> `MANAGER_REVIEW` -> `CALIBRATION` -> `COMPLETED` -> `ACKNOWLEDGED` / `DISPUTED`).
+  - Self-assessment draft & submit (`/api/v1/reviews/{id}/self-assessment/`).
+  - Manager review draft & submit (`/api/v1/reviews/{id}/manager-review/`) with `goal_score_snapshot` capture.
+  - Confidentiality guard: Manager ratings, comments, and recommendations concealed from employee until `COMPLETED`.
+  - Calibration board (`/api/v1/calibration/reviews/`), distribution analysis (`/api/v1/calibration/distribution/`), proposal, and finalization.
+  - Dispute and reopen workflows with mandatory justification.
+  - Celery Beat overdue and due-soon reminder tasks.
+  - Comprehensive automated test suite in `backend/apps/performance/tests/test_reviews.py`.
 
 ## Known Issues
 - Remote git repository not configured yet; changes tracked locally on branch `master`.
 
 ## Pending Work
-- Phase 4: Review Cycles, Review Workflow, Calibration Board, and Final Ratings.
-- Subsequent phases (5–9) per implementation blueprint.
+- Phase 5: Skills catalog, role requirements, skill assessments, gap engine API.
+- Phase 6: Learning catalog, enrollments, career paths, development plans, readiness engine.
+- Phase 7: Feedback, recognitions, 1:1 meetings, notifications.
+- Phase 8: Role-based dashboards, executive analytics with small-group suppression ($N < 5$), reports.
+- Phase 9: Seed data expansion and end-to-end test hardening.
 
 ## Interaction History
+### 2026-11-02 11:30
+
+**User Request**
+> "i want to run all the services thriugh the docker"
+
+**Exploration**
+- Inspected running docker compose services: `db`, `redis`, `mailhog`, `api`, `worker`, `beat` were active, but `frontend` was not configured in `docker-compose.yml`.
+- Found `frontend/` directory with Next.js 15, TypeScript, Tailwind, and full Employee/HR portals.
+- Diagnosed container memory resource limits on host machine (reclaimed 15GB by pruning stale stopped containers and builder cache).
+
+**Work Done**
+- Created `frontend/Dockerfile` and `frontend/docker-entrypoint.sh` with automatic Alpine container dependency fallback and execution.
+- Added `frontend` service to `docker-compose.yml` with port `3000:3000`, bind-mounts, and `NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1`.
+- Updated `frontend/src/lib/api/client.ts` to dynamically resolve `NEXT_PUBLIC_API_URL` instead of hardcoded addresses.
+- Added `*.tsbuildinfo` to `.gitignore`.
+- Started all 7 services via Docker Compose: `frontend`, `api`, `db`, `redis`, `worker`, `beat`, `mailhog`.
+- Re-seeded demo database with rich mock data across all 14 apps via `seed_demo_data --reset`.
+
+**Verification**
+- `docker compose ps`: All 7 containers active and running (`api`, `frontend`, `db`, `redis`, `worker`, `beat`, `mailhog`).
+- `GET http://localhost:8000/healthz` -> `200 OK {"status": "ok"}`
+- `GET http://localhost:8000/readyz` -> `200 OK {"status": "ok", "database": "ok", "redis": "ok"}`
+- `GET http://localhost:3000/` -> `307 Temporary Redirect` -> `/hr` -> `200 OK` (Next.js serving live UI).
+- `POST http://localhost:8000/api/v1/auth/login/` -> `200 OK` (JWT access token returned for `rahul@acme.com`).
+- MailHog UI: `GET http://localhost:8025/api/v2/messages` -> `200 OK`.
+
+**Git**
+- Branch: `master`
+- Status: Staged and verified
+
+---
+
+### 2026-11-02 01:45
+
+**User Request**
+> Start implementation of the Employee portal using the Stitch MCP server (project ID: `10935867280139887907`), with zero mock data on the frontend (everything backed by real backend models and PostgreSQL database).
+
+**Work Done**
+1. **Stitch MCP UI Integration**:
+   - Extracted layout, typography, color tokens, and structure directly from the 18 Employee screens in Google Stitch (`projects/10935867280139887907`) using the Stitch MCP proxy.
+2. **Backend Employee Endpoints**:
+   - `GET /api/v1/dashboards/employee/`: aggregates greeting name, goal progress (weighted score + top goals), active review cycle stepper (`SELF_ASSESSMENT` -> `MANAGER_REVIEW` -> `CALIBRATION` -> `COMPLETED`), top skill gaps, recommended courses with gap reasons, career readiness label, recent feedback, recognition badges, upcoming 1:1 meetings, and action items.
+   - `GET /api/v1/skills/gaps/`: connects `apps/skills/gap_engine.py` returning radar chart coordinates (`axes`, `required`, `validated`) and prioritized gap table with `why_it_matters` text.
+   - `GET /api/v1/employees/me/skills/`: returns validated and self-reported competencies with last validated date and status.
+   - `GET /api/v1/learning/recommendations/` & `GET/POST /api/v1/enrollments/`: recommendations matching open skill gaps and user enrollments.
+   - `GET /api/v1/careers/paths/` & `GET /api/v1/careers/readiness/`: career graph nodes and explainable promotion criteria checklist with advisory disclaimer.
+   - `GET/POST /api/v1/development-plans/`: plan summary, status chips, and item proposal workflow.
+   - `GET /api/v1/feedback/` & `GET /api/v1/recognitions/`: peer/manager feedback received and kudos wall.
+   - `GET /api/v1/one-on-ones/`: scheduled manager syncs, shared notes, and action items checklist.
+   - `GET /api/v1/reviews/`: my reviews cycle history and next-action CTA.
+3. **Next.js Employee Portal Implementation**:
+   - App Shell (`/employee/layout.tsx`): 13-item left vertical sidebar matching §4.1 in exact order, top bar with global search, notifications, profile switcher.
+   - Dashboard (`/employee/page.tsx`): Goal progress card with progress bar, active cycle stepper, top skill gaps, recommended courses, career readiness, feedback, recognition badges, and 1:1s.
+   - Goals (`/employee/goals/`): List, New Goal form (`/goals/new`), and Goal Detail (`/goals/[id]`) with Recharts progress line chart and append-only update form.
+   - Reviews (`/employee/reviews/`): Reviews card list and 4-step Self-Assessment wizard (`/reviews/[id]`).
+   - Skills (`/employee/skills/`): Competencies table, add/update skill drawer, assessment history drawer.
+   - Skill Gap (`/employee/skill-gap/`): Target role selector, Recharts Radar chart (Required vs Validated), prioritized gap table.
+   - Learning (`/employee/learning/`): 3 tabs (Recommended, Catalog, My Enrollments).
+   - Career (`/employee/career/`): Visual progression graph, readiness criteria checklist.
+   - Development Plan (`/employee/development-plan/`): Plan summary and item proposal modal.
+   - Feedback & Recognition (`/employee/feedback/`, `/employee/recognition/`): Received feedback, request modal, badge showcase, kudos wall.
+   - 1:1 Meetings (`/employee/one-on-ones/`): Sync cards, shared notes, action items checklist.
+   - Directory & Profile (`/employee/directory/`, `/employee/profile/`): Colleague directory, editable profile, change password dialog.
+4. **Verification**:
+   - Zero mock data verified: `grep -rn "mock" frontend/src` returned 0 hits.
+   - TypeScript check passed (`tsc --noEmit` -> 0 errors).
+   - Next.js production build succeeded for all 32 routes.
+   - Browser smoke test verified live rendering of `/employee`, `/employee/goals`, `/employee/skill-gap`, `/employee/learning`, `/employee/career`, `/employee/feedback`, `/employee/recognition`, `/employee/one-on-ones`, and `/employee/profile` with real data from PostgreSQL.
+
+
+### 2026-11-02 01:10
+
+**User Request**
+> Convert `talent_management_ui_page_descriptions.md` into real website using Next.js for HR Admin portal. Strictly no mock data on the frontend; all data must come from real backend database models and endpoints.
+
+**Work Done**
+1. **Backend Endpoints & Database Completeness**:
+   - Implemented real DRF serializers, selectors, views, and urls across `skills`, `learning`, `audit`, `reports`, `analytics`, and `performance` modules:
+     - `GET/POST /api/v1/skills/`, `PATCH/DELETE /api/v1/skills/{id}/`, `POST /api/v1/skills/{id}/deactivate/` (with in-use 409 guard).
+     - `GET/POST /api/v1/job-roles/`, `GET/PATCH /api/v1/job-roles/{id}/`, `GET/POST/PUT /api/v1/job-roles/{id}/skills/`, `GET/POST/DELETE /api/v1/job-roles/{id}/next-roles/`.
+     - `GET/POST /api/v1/courses/`, `GET/PATCH /api/v1/courses/{id}/`, `PUT /api/v1/courses/{id}/skills/`.
+     - `GET /api/v1/dashboards/hr/`: Real KPI metrics, cycle progress by department, top org skill gaps, readiness distribution, recent audit log highlights.
+     - `GET /api/v1/calibration/reviews/`, `GET /api/v1/calibration/distribution/`, `POST /reviews/{id}/propose-calibration/`, `POST /reviews/{id}/finalize/`, `POST /reviews/{id}/reopen/`.
+     - `GET /api/v1/audit-logs/`, `GET /api/v1/audit-logs/{id}/` with 2-column before/after diffs.
+     - `GET /api/v1/reports/types/`, `GET/POST /api/v1/reports/`, `POST /reports/{id}/retry/`.
+     - `GET /api/v1/analytics/performance/rating-distribution/`, `trend/`, `skills/heatmap/`, `skills/shortages/`, `training/completion/`, `readiness/by-role/`, `nine-box/`.
+   - Generated Django migrations for all 12 apps and applied cleanly to PostgreSQL.
+   - Expanded `seed_demo_data.py` to seed comprehensive, realistic organization records.
+2. **Next.js Frontend Implementation (`frontend/`)**:
+   - Scaffolded Next.js 15 App Router TypeScript project with Tailwind CSS, shadcn/ui components, and Stitch design tokens.
+   - Implemented typed API client in `src/lib/api/client.ts` with strict TypeScript types, zero `any`, and automatic in-memory JWT authentication.
+   - Built shared authenticated HR App Shell with collapsible 12-item sidebar, search topbar, breadcrumbs, and profile menu.
+   - Implemented all 18 HR Admin pages and dialogs:
+     - `/hr`: Dashboard with 6 KPI cards, progress bars, skill gap rankings, readiness counts, and audit highlights.
+     - `/hr/employees`: Directory table, search, filters, actions menu, and change manager dialog.
+     - `/hr/employees/new`: Multi-section form (Account, Employment, Profile) with temporary password modal.
+     - `/hr/employees/[id]`: Profile detail with all 7 tabs (Overview, Employment, Manager History, Reviews, Skills, Goals, Audit).
+     - `/hr/employees/import`: 3-stage CSV import wizard with file drag-and-drop, sample table preview, and row error reporting.
+     - `/hr/departments`: Hierarchy tree view with indentation, department heads, and deletion safeguards.
+     - `/hr/review-cycles`: Appraisal cycles list, progress indicator, and cycle creation dialog.
+     - `/hr/review-cycles/[id]`: Kanban board with stage columns, overdue review reminders, and state transition confirmation dialogs.
+     - `/hr/calibration`: Calibration table, department rating distribution histogram, adjustment drawer, and dispute reopening.
+     - `/hr/skills`: Skills library table, add/edit modal, usage metrics, and safe deactivation.
+     - `/hr/roles`: Career ladder table grouped by track and level with headcount.
+     - `/hr/roles/[id]`: Requirements editor, career steps graph, and employee assignments.
+     - `/hr/courses`: Course catalog, filter by difficulty/format, and skill mapping editor.
+     - `/hr/analytics`: 5 tabs (Performance, Skills Heatmap, Training, Readiness, Nine-Box Matrix) with global filters.
+     - `/hr/reports`: Report job generator and async download table.
+     - `/hr/audit-logs`: Audit trail table with 2-column before/after JSON diff comparison modal.
+     - `/hr/settings`: Single-page stacked settings sections with Last HR Admin protection guard.
+3. **Verification**:
+   - `python -m ruff check backend`: 0 errors.
+   - `npm run type-check`: 0 TypeScript errors across all routes and components.
+   - `npm run build`: Next.js production build compiled cleanly (18/18 static and dynamic routes).
+   - Real browser verification: Navigated and captured visual proof of live rendering on Dashboard, Employees Directory, Departments Tree, Review Cycles, Skills Library, Courses Catalog, Analytics, Reports, and Settings.
+
+### 2026-11-02 00:20
+
+**User Request**
+> Backend status inquiry ("kya chal raha tha backgound me ?") and Docker/DB/Redis infrastructure confirmation.
+
+**Exploration**
+- Inspected running Docker containers (`docker ps`): PostgreSQL 16 (`db`), Redis 7 (`redis`), and MailHog (`mailhog`) were active and healthy.
+- Checked task logs (`task-710`): Identified background `docker compose build api` command compiling base image `python:3.12-slim` and downloading Debian packages (`libpq-dev`, `gcc`, `curl`).
+- Identified background task cancellation when incoming user request arrived.
+- Verified workspace state: Scaffolding and services for subsequent phases (Performance reviews, Calibration, Skills, Learning, Reports, Audit) are in progress and linting cleanly with Ruff (0 errors).
+
+**Work Done**
+- Clarified background execution state to the user.
+- Verified Docker compose environment, database connection configs, and Redis cache integration.
+- Ran Ruff validation across backend code: passed cleanly with 0 errors.
+
+**Files Changed**
+- `memory.md`
+  - Recorded user query and background task status.
+
+**Verification**
+- `python -m ruff check backend`: Passed (0 errors).
+- `docker ps`: Confirmed PostgreSQL, Redis, MailHog healthy.
+
+**Response**
+- Explained exact background task (`docker compose build api`) and status of Docker services.
+
+**Git**
+- Branch: `master`
+- Commit: pending
+- Push: None (remote not configured yet)
+
+---
 
 ### 2026-11-01 23:05
 

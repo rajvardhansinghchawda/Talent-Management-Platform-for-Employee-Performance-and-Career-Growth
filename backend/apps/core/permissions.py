@@ -12,6 +12,8 @@ class HasRole(BasePermission):
     def __init__(self, *allowed_roles: str):
         self.allowed_roles = allowed_roles
 
+    def __call__(self):
+        return self
     def has_permission(self, request, view) -> bool:
         return bool(
             request.user

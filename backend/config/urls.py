@@ -10,3 +10,5 @@ urlpatterns = [
     path("api/v1/", include("config.api_urls")),
     path("", include("apps.core.urls")),
 ]
+
+handler404 = "apps.core.views.custom_404_handler"

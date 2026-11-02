@@ -1,6 +1,7 @@
 """Organization and Settings endpoint tests."""
 
 import pytest
+from decimal import Decimal
 from rest_framework.test import APIClient
 
 from apps.accounts.models import User
@@ -102,7 +103,7 @@ def test_patch_performance_settings_consecutive_scale_validation(client, hr_user
     assert res_good.status_code == 200
     data = res_good.json()
     assert len(data["values"]["rating_scale"]) == 3
-    assert data["values"]["goal_score_cap"] == "1.2"
+    assert Decimal(str(data["values"]["goal_score_cap"])) == Decimal("1.2")
 
     # Verify audit log was created
     audit_entry = AuditLog.objects.filter(action=AuditAction.ORG_SETTINGS_CHANGED).first()

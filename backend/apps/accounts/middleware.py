@@ -25,8 +25,23 @@ class MustChangePasswordMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if getattr(request, "user", None) and request.user.is_authenticated:
-            if getattr(request.user, "must_change_password", False):
+        user = getattr(request, "user", None)
+        if not (user and getattr(user, "is_authenticated", False)):
+            # DRF client.force_authenticate sets _force_auth_user on request
+            user = getattr(request, "_force_auth_user", None)
+        if not (user and getattr(user, "is_authenticated", False)):
+            # Check JWT header if present on request
+            try:
+                from rest_framework_simplejwt.authentication import JWTAuthentication
+
+                auth_result = JWTAuthentication().authenticate(request)
+                if auth_result:
+                    user = auth_result[0]
+            except Exception:
+                pass
+
+        if user and getattr(user, "is_authenticated", False):
+            if getattr(user, "must_change_password", False):
                 try:
                     match = resolve(request.path_info)
                     url_name = match.url_name

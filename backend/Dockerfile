@@ -5,16 +5,11 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    gcc \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+
 
 COPY requirements/base.txt requirements/base.txt
-COPY requirements/dev.txt requirements/dev.txt
 
-RUN pip install --no-cache-dir -r requirements/dev.txt
+RUN pip install --timeout=300 --retries 5 -r requirements/base.txt
 
 COPY . .
 

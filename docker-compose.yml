@@ -91,6 +91,22 @@ services:
       DATABASE_URL: postgresql://talent:talent@db:5432/talent_db
       REDIS_URL: redis://redis:6379/0
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    command: npm run dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+
 volumes:
   postgres_data:
   media_data:

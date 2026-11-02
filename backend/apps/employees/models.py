@@ -63,6 +63,11 @@ class Employee(BaseModel):
         return f"{self.first_name} {self.last_name}".strip()
 
     @property
+    def name(self) -> str:
+        return self.full_name
+
+
+    @property
     def designation(self) -> str | None:
         return self.job_role.title if self.job_role else None
 

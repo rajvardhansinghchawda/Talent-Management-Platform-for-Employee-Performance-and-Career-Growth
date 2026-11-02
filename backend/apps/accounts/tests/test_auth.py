@@ -43,7 +43,9 @@ def org(db):
 @pytest.mark.django_db
 def test_login_success(client, user):
     response = client.post(
-        "/api/v1/auth/login/", {"email": "employee@example.com", "password": "StrongPass1!"}
+        "/api/v1/auth/login/",
+        {"email": "employee@example.com", "password": "StrongPass1!"},
+        format="json",
     )
     assert response.status_code == 200
     data = response.json()
@@ -56,7 +58,9 @@ def test_login_success(client, user):
 @pytest.mark.django_db
 def test_login_wrong_password(client, user):
     response = client.post(
-        "/api/v1/auth/login/", {"email": "employee@example.com", "password": "WrongPassword!"}
+        "/api/v1/auth/login/",
+        {"email": "employee@example.com", "password": "WrongPassword!"},
+        format="json",
     )
     assert response.status_code == 400
     data = response.json()
@@ -66,7 +70,9 @@ def test_login_wrong_password(client, user):
 @pytest.mark.django_db
 def test_token_refresh_via_cookie(client, user):
     login_res = client.post(
-        "/api/v1/auth/login/", {"email": "employee@example.com", "password": "StrongPass1!"}
+        "/api/v1/auth/login/",
+        {"email": "employee@example.com", "password": "StrongPass1!"},
+        format="json",
     )
     assert login_res.status_code == 200
     refresh_token = login_res.cookies["refresh_token"].value
@@ -81,7 +87,9 @@ def test_token_refresh_via_cookie(client, user):
 @pytest.mark.django_db
 def test_logout_blacklists_token_and_clears_cookie(client, user):
     login_res = client.post(
-        "/api/v1/auth/login/", {"email": "employee@example.com", "password": "StrongPass1!"}
+        "/api/v1/auth/login/",
+        {"email": "employee@example.com", "password": "StrongPass1!"},
+        format="json",
     )
     access_token = login_res.json()["access"]
     refresh_token = login_res.cookies["refresh_token"].value

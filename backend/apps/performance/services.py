@@ -22,13 +22,18 @@ from apps.performance.goal_engine import (
     compute_weighted_score,
 )
 from apps.performance.models import (
+    CycleStatus,
     Goal,
     GoalComment,
     GoalDirection,
     GoalStatus,
     GoalType,
     GoalUpdate,
+    PerformanceReview,
+    ReviewCalibrationEntry,
+    ReviewCompetencyRating,
     ReviewCycle,
+    ReviewStatus,
 )
 
 if TYPE_CHECKING:
@@ -603,3 +608,521 @@ def get_employee_goals_score(employee: Employee, cycle_id: uuid.UUID | str | Non
         "weight_sum_warning": weight_sum_warning,
         "goals": breakdown,
     }
+
+
+# ─── Review State Machine & Services ──────────────────────────────────────────
+
+VALID_REVIEW_TRANSITIONS: dict[str, list[str]] = {
+    ReviewStatus.NOT_STARTED: [ReviewStatus.SELF_ASSESSMENT],
+    ReviewStatus.SELF_ASSESSMENT: [ReviewStatus.MANAGER_REVIEW],
+    ReviewStatus.MANAGER_REVIEW: [ReviewStatus.CALIBRATION],
+    ReviewStatus.CALIBRATION: [ReviewStatus.COMPLETED],
+    ReviewStatus.COMPLETED: [ReviewStatus.ACKNOWLEDGED, ReviewStatus.DISPUTED],
+    ReviewStatus.DISPUTED: [ReviewStatus.CALIBRATION],
+    ReviewStatus.ACKNOWLEDGED: [],  # Terminal
+}
+
+
+def get_rating_scale_bounds() -> tuple[int, int]:
+    """Return (min_rating, max_rating) from org performance settings, defaulting to (1, 5)."""
+    org = get_organization()
+    if org and org.settings_performance:
+        scale = org.settings_performance.get("rating_scale")
+        if scale and isinstance(scale, list):
+            values = [int(item["value"]) for item in scale if "value" in item]
+            if values:
+                return min(values), max(values)
+    return 1, 5
+
+
+def validate_rating_in_bounds(rating: int | None, field_name: str = "rating") -> None:
+    """Validate that rating is within the configured rating scale."""
+    if rating is None:
+        return
+    min_val, max_val = get_rating_scale_bounds()
+    if rating < min_val or rating > max_val:
+        raise DomainException(
+            f"{field_name.capitalize()} must be between {min_val} and {max_val}.",
+            code="validation_error",
+            status_code=400,
+            details={field_name: [f"Rating must be between {min_val} and {max_val}."]},
+        )
+
+
+@transaction.atomic
+def transition_review(
+    review: PerformanceReview,
+    to_status: str,
+    actor: User,
+    data: dict | None = None,
+) -> PerformanceReview:
+    """
+    Explicit state machine for PerformanceReview transitions.
+    Enforces role restrictions, rating bounds, snapshotting, and audit trails.
+    """
+    data = data or {}
+    from_status = review.status
+
+    allowed_targets = VALID_REVIEW_TRANSITIONS.get(from_status, [])
+    if to_status not in allowed_targets:
+        raise DomainException(
+            f"Invalid review transition from '{from_status}' to '{to_status}'.",
+            code="state_conflict",
+            status_code=409,
+            details={"reason": "INVALID_TRANSITION", "from": from_status, "to": to_status},
+        )
+
+    # 1. NOT_STARTED -> SELF_ASSESSMENT
+    if from_status == ReviewStatus.NOT_STARTED and to_status == ReviewStatus.SELF_ASSESSMENT:
+        pass  # Typically triggered during cycle activation
+
+    # 2. SELF_ASSESSMENT -> MANAGER_REVIEW
+    elif from_status == ReviewStatus.SELF_ASSESSMENT and to_status == ReviewStatus.MANAGER_REVIEW:
+        if review.employee.user_id != actor.id and actor.role != "HR_ADMIN":
+            raise DomainException(
+                "Only the employee being reviewed can submit self-assessment.",
+                code="forbidden",
+                status_code=403,
+            )
+
+        self_rating = data.get("self_rating", review.self_rating)
+        validate_rating_in_bounds(self_rating, "self_rating")
+
+        review.self_rating = self_rating
+        review.self_comments = data.get("self_comments", review.self_comments)
+        review.self_assessment_submitted_at = timezone.now()
+
+        # Save competencies if provided
+        for comp in data.get("competencies", []):
+            c_name = comp.get("name") or comp.get("competency_name")
+            if c_name:
+                ReviewCompetencyRating.objects.update_or_create(
+                    review=review,
+                    competency_name=c_name,
+                    defaults={
+                        "self_rating": comp.get("self_rating") or comp.get("rating"),
+                        "comment": comp.get("comment", ""),
+                    },
+                )
+
+        # Notify manager
+        if review.reviewer and review.reviewer.user:
+            notify(
+                user=review.reviewer.user,
+                category=NotificationCategory.REVIEW_DUE,
+                title=f"Manager Review Due: {review.employee.name}",
+                body=f"{review.employee.name} has submitted their self-assessment for {review.cycle.name}.",
+                link=f"/manager/reviews/{review.id}",
+            )
+
+    # 3. MANAGER_REVIEW -> CALIBRATION
+    elif from_status == ReviewStatus.MANAGER_REVIEW and to_status == ReviewStatus.CALIBRATION:
+        is_reviewer = review.reviewer and review.reviewer.user_id == actor.id
+        if not is_reviewer and actor.role != "HR_ADMIN":
+            raise DomainException(
+                "Only the assigned reviewer can submit the manager review.",
+                code="forbidden",
+                status_code=403,
+            )
+
+        mgr_rating = data.get("manager_rating", review.manager_rating)
+        validate_rating_in_bounds(mgr_rating, "manager_rating")
+
+        review.manager_rating = mgr_rating
+        review.manager_comments = data.get("manager_comments", review.manager_comments)
+        review.manager_review_submitted_at = timezone.now()
+
+        if "development_recommendations" in data:
+            review.development_recommendations = data["development_recommendations"]
+
+        # Save competencies manager ratings
+        for comp in data.get("competencies", []):
+            c_name = comp.get("name") or comp.get("competency_name")
+            if c_name:
+                ReviewCompetencyRating.objects.update_or_create(
+                    review=review,
+                    competency_name=c_name,
+                    defaults={
+                        "manager_rating": comp.get("manager_rating") or comp.get("rating"),
+                    },
+                )
+
+        # Snapshot goal score at time of manager submit
+        goal_summary = get_employee_goals_score(review.employee, cycle_id=review.cycle_id)
+        review.goal_score_snapshot = goal_summary["weighted_score"]
+
+    # 4. CALIBRATION -> COMPLETED
+    elif from_status == ReviewStatus.CALIBRATION and to_status == ReviewStatus.COMPLETED:
+        if actor.role != "HR_ADMIN":
+            raise DomainException(
+                "Only HR Admins can finalize calibration and approve final ratings.",
+                code="forbidden",
+                status_code=403,
+            )
+
+        rating = (
+            data.get("final_rating") or review.proposed_calibrated_rating or review.manager_rating
+        )
+        validate_rating_in_bounds(rating, "final_rating")
+        if not rating:
+            raise DomainException(
+                "A rating is required to finalize the review.",
+                code="validation_error",
+                status_code=400,
+            )
+
+        review.calibrated_rating = rating
+        review.final_rating = rating
+
+        comment = data.get("comment", "")
+        if comment:
+            ReviewCalibrationEntry.objects.create(
+                review=review,
+                actor=actor,
+                from_rating=review.manager_rating,
+                to_rating=rating,
+                comment=comment,
+            )
+
+        # Notify employee
+        if review.employee.user:
+            notify(
+                user=review.employee.user,
+                category=NotificationCategory.REVIEW_COMPLETED,
+                title=f"Performance Review Completed: {review.cycle.name}",
+                body="Your performance review has been finalized. You may now view your final rating and feedback.",
+                link=f"/employee/reviews/{review.id}",
+            )
+
+    # 5. COMPLETED -> ACKNOWLEDGED
+    elif from_status == ReviewStatus.COMPLETED and to_status == ReviewStatus.ACKNOWLEDGED:
+        if review.employee.user_id != actor.id and actor.role != "HR_ADMIN":
+            raise DomainException(
+                "Only the employee can acknowledge their completed review.",
+                code="forbidden",
+                status_code=403,
+            )
+        review.acknowledged_at = timezone.now()
+
+    # 6. COMPLETED -> DISPUTED
+    elif from_status == ReviewStatus.COMPLETED and to_status == ReviewStatus.DISPUTED:
+        if review.employee.user_id != actor.id and actor.role != "HR_ADMIN":
+            raise DomainException(
+                "Only the employee can dispute their review.",
+                code="forbidden",
+                status_code=403,
+            )
+
+        reason = data.get("reason", "").strip()
+        if not reason:
+            raise DomainException(
+                "A dispute reason is required.",
+                code="validation_error",
+                status_code=400,
+                details={"reason": ["Dispute reason cannot be empty."]},
+            )
+
+        review.dispute_reason = reason
+        review.disputed_at = timezone.now()
+
+        # Notify reviewer
+        if review.reviewer and review.reviewer.user:
+            notify(
+                user=review.reviewer.user,
+                category=NotificationCategory.REVIEW_DUE,
+                title=f"Review Disputed: {review.employee.name}",
+                body=f"{review.employee.name} has submitted a dispute on their review: {reason}",
+                link=f"/manager/reviews/{review.id}",
+            )
+
+    # 7. DISPUTED -> CALIBRATION (Reopen)
+    elif from_status == ReviewStatus.DISPUTED and to_status == ReviewStatus.CALIBRATION:
+        if actor.role != "HR_ADMIN":
+            raise DomainException(
+                "Only HR Admins can reopen a disputed review.",
+                code="forbidden",
+                status_code=403,
+            )
+
+        comment = data.get("comment", "").strip()
+        review.dispute_reason = f"[REOPENED] {comment}" if comment else "[REOPENED]"
+
+    review.status = to_status
+    review.save()
+
+    audit_log(
+        actor=actor,
+        action="REVIEW_TRANSITION",
+        entity_type="performance_review",
+        entity_id=str(review.id),
+        entity_label=f"Review: {review.employee.name} — {review.cycle.name}",
+        before={"status": from_status},
+        after={"status": to_status},
+    )
+
+    return review
+
+
+@transaction.atomic
+def propose_calibration(
+    review: PerformanceReview,
+    calibrated_rating: int,
+    comment: str,
+    actor: User,
+) -> PerformanceReview:
+    """Records proposed calibration rating and comment."""
+    if actor.role != "HR_ADMIN":
+        raise DomainException(
+            "Only HR Admins can propose calibrated ratings.",
+            code="forbidden",
+            status_code=403,
+        )
+
+    validate_rating_in_bounds(calibrated_rating, "calibrated_rating")
+    if not comment or not comment.strip():
+        raise DomainException(
+            "A comment is required when proposing a calibrated rating.",
+            code="validation_error",
+            status_code=400,
+            details={"comment": ["Comment cannot be empty."]},
+        )
+
+    review.proposed_calibrated_rating = calibrated_rating
+    review.calibration_comment = comment.strip()
+    review.status = ReviewStatus.CALIBRATION
+    review.save(
+        update_fields=[
+            "proposed_calibrated_rating",
+            "calibration_comment",
+            "status",
+            "updated_at",
+        ]
+    )
+
+    ReviewCalibrationEntry.objects.create(
+        review=review,
+        actor=actor,
+        from_rating=review.manager_rating,
+        to_rating=calibrated_rating,
+        comment=comment.strip(),
+    )
+
+    audit_log(
+        actor=actor,
+        action="CALIBRATION_PROPOSED",
+        entity_type="performance_review",
+        entity_id=str(review.id),
+        entity_label=f"Review: {review.employee.name}",
+        after={"calibrated_rating": calibrated_rating, "comment": comment.strip()},
+    )
+
+    return review
+
+
+@transaction.atomic
+def activate_review_cycle(cycle: ReviewCycle, actor: User) -> ReviewCycle:
+    """Activates a DRAFT review cycle, creating reviews for active employees and snapshotting scale."""
+    if cycle.status != CycleStatus.DRAFT:
+        raise DomainException(
+            f"Only DRAFT cycles can be activated (current: {cycle.status}).",
+            code="state_conflict",
+            status_code=409,
+        )
+
+    org = get_organization()
+    if org and org.settings_performance:
+        cycle.rating_scale_snapshot = org.settings_performance.get("rating_scale")
+
+    cycle.status = CycleStatus.ACTIVE
+    cycle.save(update_fields=["status", "rating_scale_snapshot", "updated_at"])
+
+    # Create reviews for active employees in included departments
+    from apps.employees.models import Employee, EmploymentStatus
+
+    depts = cycle.departments.all()
+    employees = Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE)
+    if depts.exists():
+        employees = employees.filter(department__in=depts)
+
+    for emp in employees:
+        PerformanceReview.objects.get_or_create(
+            employee=emp,
+            cycle=cycle,
+            defaults={
+                "reviewer": emp.manager,
+                "status": ReviewStatus.SELF_ASSESSMENT,
+            },
+        )
+
+    # Celery notification task
+    from apps.performance.tasks import send_cycle_activation_notifications
+
+    transaction.on_commit(lambda: send_cycle_activation_notifications.delay(str(cycle.id)))
+
+    audit_log(
+        actor=actor,
+        action="CYCLE_ACTIVATED",
+        entity_type="review_cycle",
+        entity_id=str(cycle.id),
+        entity_label=cycle.name,
+        after={"status": cycle.status, "reviews_created": employees.count()},
+    )
+
+    return cycle
+
+
+@transaction.atomic
+def start_calibration_cycle(cycle: ReviewCycle, actor: User, force: bool = False) -> ReviewCycle:
+    """Transitions an active cycle to calibration."""
+    if cycle.status != CycleStatus.ACTIVE:
+        raise DomainException(
+            f"Only ACTIVE cycles can enter calibration (current: {cycle.status}).",
+            code="state_conflict",
+            status_code=409,
+        )
+
+    pending_self = PerformanceReview.objects.filter(
+        cycle=cycle, status=ReviewStatus.SELF_ASSESSMENT
+    ).count()
+
+    if pending_self > 0 and not force:
+        raise DomainException(
+            f"{pending_self} self-assessment(s) are still pending. Pass force=true to proceed.",
+            code="state_conflict",
+            status_code=409,
+            details={"reason": "PENDING_SELF_ASSESSMENTS", "pending_count": pending_self},
+        )
+
+    cycle.status = CycleStatus.CALIBRATION
+    cycle.save(update_fields=["status", "updated_at"])
+
+    audit_log(
+        actor=actor,
+        action="CYCLE_CALIBRATION_STARTED",
+        entity_type="review_cycle",
+        entity_id=str(cycle.id),
+        entity_label=cycle.name,
+        after={"status": cycle.status, "force": force},
+    )
+
+    return cycle
+
+
+@transaction.atomic
+def close_review_cycle(cycle: ReviewCycle, actor: User) -> ReviewCycle:
+    """Closes a review cycle, ensuring all reviews are resolved."""
+    if cycle.status != CycleStatus.CALIBRATION:
+        raise DomainException(
+            f"Only cycles in CALIBRATION can be closed (current: {cycle.status}).",
+            code="state_conflict",
+            status_code=409,
+        )
+
+    unresolved = (
+        PerformanceReview.objects.filter(cycle=cycle)
+        .exclude(
+            status__in=[ReviewStatus.COMPLETED, ReviewStatus.ACKNOWLEDGED, ReviewStatus.DISPUTED]
+        )
+        .count()
+    )
+
+    if unresolved > 0:
+        raise DomainException(
+            f"{unresolved} review(s) are not yet finalized. All reviews must be completed before closing.",
+            code="state_conflict",
+            status_code=409,
+            details={"reason": "UNCOMPLETED_REVIEWS", "unresolved_count": unresolved},
+        )
+
+    cycle.status = CycleStatus.CLOSED
+    cycle.save(update_fields=["status", "updated_at"])
+
+    audit_log(
+        actor=actor,
+        action="CYCLE_CLOSED",
+        entity_type="review_cycle",
+        entity_id=str(cycle.id),
+        entity_label=cycle.name,
+        after={"status": cycle.status},
+    )
+
+    return cycle
+
+
+def get_cycle_action_preview(cycle: ReviewCycle, action: str) -> dict:
+    """Provide consequence and blocker previews for cycle status transitions."""
+    from apps.employees.models import Employee, EmploymentStatus
+
+    if action == "activate":
+        depts = cycle.departments.all()
+        emp_qs = Employee.objects.filter(employment_status=EmploymentStatus.ACTIVE)
+        if depts.exists():
+            emp_qs = emp_qs.filter(department__in=depts)
+        emp_count = emp_qs.count()
+
+        blockers = []
+        if cycle.status != CycleStatus.DRAFT:
+            blockers.append(
+                f"Cycle is in {cycle.status} status; only DRAFT cycles can be activated."
+            )
+
+        return {
+            "action": "activate",
+            "consequences": [
+                f"Will create {emp_count} performance reviews in SELF_ASSESSMENT status.",
+                "Will snapshot current organization rating scale.",
+                "Will notify all eligible employees and reviewers.",
+            ],
+            "counts": {"reviews_to_create": emp_count, "notifications_to_send": emp_count * 2},
+            "blockers": blockers,
+        }
+
+    elif action == "start_calibration":
+        pending_self = PerformanceReview.objects.filter(
+            cycle=cycle, status=ReviewStatus.SELF_ASSESSMENT
+        ).count()
+        blockers = []
+        if cycle.status != CycleStatus.ACTIVE:
+            blockers.append("Cycle must be in ACTIVE status to start calibration.")
+        if pending_self > 0:
+            blockers.append(f"{pending_self} reviews are still in SELF_ASSESSMENT.")
+
+        return {
+            "action": "start_calibration",
+            "consequences": [
+                "Will move review cycle to CALIBRATION status.",
+                "HR calibration board will open for rating adjustments.",
+            ],
+            "counts": {"pending_self_assessments": pending_self},
+            "blockers": blockers,
+        }
+
+    elif action == "close":
+        unresolved = (
+            PerformanceReview.objects.filter(cycle=cycle)
+            .exclude(
+                status__in=[
+                    ReviewStatus.COMPLETED,
+                    ReviewStatus.ACKNOWLEDGED,
+                    ReviewStatus.DISPUTED,
+                ]
+            )
+            .count()
+        )
+        blockers = []
+        if cycle.status != CycleStatus.CALIBRATION:
+            blockers.append("Cycle must be in CALIBRATION status to be closed.")
+        if unresolved > 0:
+            blockers.append(f"{unresolved} reviews are still pending finalization.")
+
+        return {
+            "action": "close",
+            "consequences": [
+                "Will permanently close the review cycle.",
+                "All finalized ratings will be locked.",
+            ],
+            "counts": {"unresolved_reviews": unresolved},
+            "blockers": blockers,
+        }
+
+    return {"action": action, "consequences": [], "counts": {}, "blockers": ["Unknown action."]}

@@ -6,6 +6,8 @@ from django.utils import timezone
 
 from .constants import Role
 
+UserRole = Role
+
 
 class UserManager(BaseUserManager):
     def create_user(self, email: str, password: str | None = None, **extra_fields):
@@ -57,6 +59,21 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self) -> str:
         return self.email
+
+    def get_full_name(self) -> str:
+        if hasattr(self, "employee_profile"):
+            return self.employee_profile.name
+        return self.email
+
+    def get_short_name(self) -> str:
+        if hasattr(self, "employee_profile"):
+            return getattr(self.employee_profile, "preferred_name", None) or self.employee_profile.name
+        return self.email
+
+    @property
+    def employee(self):
+        """Convenience property for accessing the linked employee profile."""
+        return getattr(self, "employee_profile", None)
 
     @property
     def is_locked(self) -> bool:

@@ -150,6 +150,12 @@ def update_user_role_and_status(
     from apps.audit import services as audit_services
     from apps.audit.models import AuditAction
 
+    if isinstance(is_active, str):
+        if is_active.lower() in ("false", "0"):
+            is_active = False
+        elif is_active.lower() in ("true", "1"):
+            is_active = True
+
     # Check if target is HR_ADMIN and is being demoted or deactivated
     demoting = new_role is not None and new_role != "HR_ADMIN" and user.role == "HR_ADMIN"
     deactivating = is_active is False and user.is_active and user.role == "HR_ADMIN"

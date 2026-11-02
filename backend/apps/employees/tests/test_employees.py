@@ -166,6 +166,7 @@ def test_manager_cycle_prevention(client, hr_user, manager_user, report_user):
     self_res = client.post(
         f"/api/v1/employees/{mgr_emp.id}/change-manager/",
         {"manager": str(mgr_emp.id), "effective_date": "2024-02-01"},
+        format="json",
     )
     assert self_res.status_code == 409
     assert self_res.json()["error"]["details"]["reason"] == "CYCLE_DETECTED"
@@ -174,6 +175,7 @@ def test_manager_cycle_prevention(client, hr_user, manager_user, report_user):
     cycle_res = client.post(
         f"/api/v1/employees/{mgr_emp.id}/change-manager/",
         {"manager": str(dev_emp.id), "effective_date": "2024-02-01"},
+        format="json",
     )
     assert cycle_res.status_code == 409
     assert cycle_res.json()["error"]["details"]["reason"] == "CYCLE_DETECTED"
@@ -217,7 +219,9 @@ def test_department_tree_and_cycle_prevention(client, hr_user):
     assert any(node["name"] == "Engineering" and len(node["children"]) == 1 for node in tree)
 
     # Attempt to set d1's parent to d2 (creates cycle)
-    cycle_res = client.patch(f"/api/v1/departments/{d1.id}/", {"parent": str(d2.id)})
+    cycle_res = client.patch(
+        f"/api/v1/departments/{d1.id}/", {"parent": str(d2.id)}, format="json"
+    )
     assert cycle_res.status_code == 409
     assert cycle_res.json()["error"]["details"]["reason"] == "CYCLE_DETECTED"
 
