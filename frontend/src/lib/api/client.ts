@@ -104,13 +104,53 @@ function processQueue(error: unknown, token: string | null = null): void {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
+/**
+ * Attempt to restore an active user session on app load using the httpOnly refresh_token cookie.
+ * Returns the authenticated User if valid, or null if unauthenticated.
+ */
+export async function restoreSession(): Promise<User | null> {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const refreshRes = await fetch(`${API_BASE}/auth/refresh/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+
+    if (refreshRes.ok) {
+      const data = (await refreshRes.json()) as { access?: string; token?: string };
+      const newToken = data.access || data.token || null;
+      if (newToken) {
+        setAccessToken(newToken);
+        const meRes = await fetch(`${API_BASE}/auth/me/`, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${newToken}`,
+          },
+          credentials: "include",
+        });
+        if (meRes.ok) {
+          const user = (await meRes.json()) as User;
+          return user;
+        }
+      }
+    }
+  } catch {
+    // No active session or network error
+  }
+
+  setAccessToken(null);
+  return null;
+}
+
 export async function fetchApi<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 
-  if (!getAccessToken() && !endpoint.includes("/auth/login") && !endpoint.includes("/auth/password/reset") && typeof window !== "undefined") {
+  if (!getAccessToken() && isRefreshing && typeof window !== "undefined") {
     await waitForToken(2000);
   }
 

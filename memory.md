@@ -60,6 +60,71 @@ Talent Management Platform for Employee Performance and Career Growth: A multi-p
 
 ## Interaction History
 
+### 2026-11-02 18:55
+
+**User Request**
+> Security test karna padegi isko, very important, mene abhi dekha me direct hr portal par bina login se login ho gaya. You have to test its security and make it fully secure.
+
+**Exploration**
+- Investigated frontend authentication and authorization flows to determine why direct access to `/hr` was possible without logging in.
+- Discovered 4 critical security gaps:
+  1. `frontend/src/app/page.tsx` had an unconditional `redirect("/hr")`.
+  2. `frontend/src/lib/auth/AuthContext.tsx` had a development auto-login hook in `initAuth()` that automatically sent `POST /api/v1/auth/login/` with hardcoded credentials (`hr@acme.com` / `Password123!`) on route changes.
+  3. `frontend/src/app/manager/layout.tsx` had an `ensureManager()` hook that auto-authenticated as `manager@acme.com`.
+  4. Portal layouts (`/hr`, `/manager`, `/executive`, `/employee`) lacked route-level authentication and role-based access control (RBAC) guards.
+
+**Work Done**
+- **Layer 1 (Next.js Server-Side Middleware)**: Created `frontend/src/middleware.ts` to inspect incoming requests for `refresh_token` httpOnly cookie. If unauthenticated, immediately issues `HTTP 307 Temporary Redirect` to `/login?redirect=<target>` before sending any HTML.
+- **Layer 2 (Client-Side RBAC Guard)**: Created `frontend/src/components/auth/PortalGuard.tsx` to strictly check authenticated session and allowed roles. Redirects unauthenticated users to `/login` and unauthorized roles (e.g. employee attempting to view HR or manager portals) to `/forbidden` (403 Access Denied).
+- **Session Restoration & Client Hardening**:
+  - Rewrote `frontend/src/lib/auth/AuthContext.tsx` to completely remove all hardcoded credentials and auto-login hooks.
+  - Implemented secure `restoreSession()` in `frontend/src/lib/api/client.ts` that safely validates session via httpOnly cookie on mount without leaking credentials.
+- **Portal Layouts Hardening**:
+  - Protected `frontend/src/app/hr/layout.tsx` with `<PortalGuard allowedRoles={["HR_ADMIN"]}>`.
+  - Protected `frontend/src/app/manager/layout.tsx` with `<PortalGuard allowedRoles={["MANAGER", "HR_ADMIN"]}>` (removed `ensureManager`).
+  - Protected `frontend/src/app/executive/layout.tsx` with `<PortalGuard allowedRoles={["EXECUTIVE", "HR_ADMIN"]}>`.
+  - Protected `frontend/src/app/employee/layout.tsx` with `<PortalGuard allowedRoles={["EMPLOYEE", "MANAGER", "EXECUTIVE", "HR_ADMIN"]}>`.
+- **Root & Login Redirection**:
+  - Updated `frontend/src/app/page.tsx` to route users based on authenticated session and role (unauthenticated -> `/login`).
+  - Updated `frontend/src/app/login/page.tsx` to support post-login `redirect` parameter with role authorization validation.
+
+**Files Changed**
+- `frontend/src/middleware.ts`
+  - Created Next.js edge/server middleware for HTTP 307 redirect on unauthenticated portal access.
+- `frontend/src/components/auth/PortalGuard.tsx`
+  - Created reusable RBAC portal guard component.
+- `frontend/src/lib/api/client.ts`
+  - Added secure `restoreSession()` and removed blocking token delays.
+- `frontend/src/lib/auth/AuthContext.tsx`
+  - Removed auto-login logic and dummy credentials; integrated `restoreSession()`.
+- `frontend/src/app/page.tsx`
+  - Fixed root redirection from static `/hr` to session-aware routing.
+- `frontend/src/app/login/page.tsx`
+  - Added `redirect` URL support and RBAC destination resolution.
+- `frontend/src/app/hr/layout.tsx`
+  - Wrapped with `<PortalGuard allowedRoles={["HR_ADMIN"]}>`.
+- `frontend/src/app/manager/layout.tsx`
+  - Wrapped with `<PortalGuard allowedRoles={["MANAGER", "HR_ADMIN"]}>`.
+- `frontend/src/app/executive/layout.tsx`
+  - Wrapped with `<PortalGuard allowedRoles={["EXECUTIVE", "HR_ADMIN"]}>`.
+- `frontend/src/app/employee/layout.tsx`
+  - Wrapped with `<PortalGuard allowedRoles={["EMPLOYEE", "MANAGER", "EXECUTIVE", "HR_ADMIN"]}>`.
+
+**Verification**
+- **Unauthenticated HTTP Test**: `curl.exe -i http://localhost:3000/hr`, `/manager`, `/employee`, `/executive`, `/` all returned `HTTP/1.1 307 Temporary Redirect` -> `location: /login`.
+- **Chrome DevTools Live Test**:
+  - Navigating to `/hr` while logged out immediately redirects to `/login?redirect=%2Fhr`.
+  - Logged in as `Rahul Sharma` (`EMPLOYEE`) and navigated to `/hr`, `/manager`, and `/executive`: all immediately redirected to `/forbidden` (403 Access Denied).
+- **Backend Test Suite**: `docker compose exec api pytest -q` passed 53/53 tests cleanly.
+
+**Git**
+- Branch: main
+- Commit: pending
+- Push: pending
+- Status: Ready to commit
+
+---
+
 ### 2026-11-02 18:40
 
 **User Request**

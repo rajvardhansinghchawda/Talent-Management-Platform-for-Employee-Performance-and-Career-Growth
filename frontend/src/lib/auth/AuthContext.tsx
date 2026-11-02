@@ -1,9 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, getAccessToken, setAccessToken } from "../api/client";
+import { api, restoreSession, setAccessToken } from "../api/client";
 import type { User } from "../api/types";
 
 interface AuthContextType {
@@ -19,7 +18,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const pathname = usePathname();
   const queryClient = useQueryClient();
 
   const refreshUser = async () => {
@@ -32,58 +30,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    async function initAuth() {
-      const isEmployeeRoute = pathname?.startsWith("/employee");
-      const isManagerRoute = pathname?.startsWith("/manager");
-      const isExecutiveRoute = pathname?.startsWith("/executive");
-      const targetEmail = isEmployeeRoute
-        ? "rahul@acme.com"
-        : isManagerRoute
-        ? "manager@acme.com"
-        : isExecutiveRoute
-        ? "exec@acme.com"
-        : "hr@acme.com";
+    let mounted = true;
 
-      if (user?.email === targetEmail && getAccessToken()) {
-        setLoading(false);
-        return;
-      }
-
-      console.log("[AuthContext] initAuth switching to:", targetEmail);
-
+    async function initSession() {
       try {
-        const res = await api.auth.login({
-          email: targetEmail,
-          password: "Password123!",
-        });
-        console.log("[AuthContext] login succeeded for:", res.user.email);
-        setAccessToken(res.access);
-        setUser(res.user);
-        queryClient.invalidateQueries();
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error("[AuthContext] login failed:", msg);
-        setUser(null);
+        const restoredUser = await restoreSession();
+        if (mounted) {
+          setUser(restoredUser);
+        }
+      } catch {
+        if (mounted) {
+          setUser(null);
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
-    initAuth();
-  }, [pathname]);
+
+    initSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const login = async (email: string, password: string): Promise<User> => {
     const res = await api.auth.login({ email, password });
     setAccessToken(res.access);
     setUser(res.user);
+    queryClient.invalidateQueries();
     return res.user;
   };
 
   const logout = async () => {
     try {
       await api.auth.logout();
+    } catch {
+      // Ignore logout errors
     } finally {
       setAccessToken(null);
       setUser(null);
+      queryClient.clear();
     }
   };
 

@@ -1,17 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Sparkles, Eye, EyeOff, Lock, Mail, ArrowRight, ShieldCheck } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Sparkles, Eye, EyeOff, Lock, Mail, ArrowRight } from "lucide-react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
-  const { login } = useAuth();
+  const searchParams = useSearchParams();
+  const { user, login, loading: authLoading } = useAuth();
+
+  const redirectUrl = searchParams.get("redirect");
 
   const [email, setEmail] = useState("rahul@acme.com");
   const [password, setPassword] = useState("Password123!");
@@ -19,21 +22,43 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function isAuthorizedForRoute(role: string, targetPath: string): boolean {
+    if (targetPath.startsWith("/hr")) return role === "HR_ADMIN";
+    if (targetPath.startsWith("/manager")) return role === "MANAGER" || role === "HR_ADMIN";
+    if (targetPath.startsWith("/executive")) return role === "EXECUTIVE" || role === "HR_ADMIN";
+    if (targetPath.startsWith("/employee")) return true;
+    return true;
+  }
+
+  function getDefaultPortal(role: string): string {
+    if (role === "HR_ADMIN") return "/hr";
+    if (role === "MANAGER") return "/manager";
+    if (role === "EXECUTIVE") return "/executive";
+    return "/employee";
+  }
+
+  // If already authenticated, redirect to authorized portal
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (redirectUrl && isAuthorizedForRoute(user.role, redirectUrl)) {
+        router.replace(redirectUrl);
+      } else {
+        router.replace(getDefaultPortal(user.role));
+      }
+    }
+  }, [user, authLoading, redirectUrl, router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
     try {
-      const user = await login(email, password);
-      if (user.role === "HR_ADMIN") {
-        router.push("/hr");
-      } else if (user.role === "MANAGER") {
-        router.push("/manager");
-      } else if (user.role === "EXECUTIVE") {
-        router.push("/executive");
+      const loggedUser = await login(email, password);
+      if (redirectUrl && isAuthorizedForRoute(loggedUser.role, redirectUrl)) {
+        router.push(redirectUrl);
       } else {
-        router.push("/employee");
+        router.push(getDefaultPortal(loggedUser.role));
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Invalid credentials. Please verify your email and password.";
@@ -192,5 +217,19 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50/75 flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }
