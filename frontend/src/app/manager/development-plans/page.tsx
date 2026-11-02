@@ -138,7 +138,8 @@ export default function TeamDevelopmentPlansPage() {
         />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
+          {/* Desktop Table (md:block, hidden on mobile) */}
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -199,6 +200,51 @@ export default function TeamDevelopmentPlansPage() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobile Stacked Cards (< md) */}
+          <div className="block md:hidden divide-y divide-slate-100">
+            {plans.map((p) => (
+              <div key={p.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-bold text-slate-900 text-sm block">{p.employee_name}</span>
+                    <span className="text-[11px] text-slate-500 font-mono">
+                      {p.employee_code} · Target: <strong className="text-indigo-700">{p.target_role_title || "General"}</strong>
+                    </span>
+                  </div>
+                  <StatusChip status={p.status} />
+                </div>
+
+                <div className="space-y-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">{p.item_count} items ({p.target_date ? `Due ${formatDate(p.target_date)}` : "No deadline"})</span>
+                    <span className="font-bold text-indigo-600">{p.progress_pct}%</span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                    <div
+                      className="h-full bg-indigo-600 rounded-full"
+                      style={{ width: `${p.progress_pct}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end pt-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedPlanId(p.id);
+                      setAssignCourseOpen(true);
+                    }}
+                    className="h-8 px-3 text-xs text-indigo-600 border-indigo-200 hover:bg-indigo-50 w-full sm:w-auto"
+                  >
+                    <BookOpen className="w-3.5 h-3.5 mr-1.5" />
+                    Assign Course
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}
