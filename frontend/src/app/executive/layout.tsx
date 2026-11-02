@@ -12,7 +12,7 @@ export default function ExecutiveLayout({
   children: React.ReactNode;
 }) {
   return (
-    <PortalGuard allowedRoles={["EXECUTIVE", "HR_ADMIN"]}>
+    <PortalGuard allowedRoles={["EXECUTIVE"]}>
       <div className="flex min-h-screen bg-slate-50/50">
         {/* 5-item Executive Sidebar */}
         <ExecutiveSidebar />

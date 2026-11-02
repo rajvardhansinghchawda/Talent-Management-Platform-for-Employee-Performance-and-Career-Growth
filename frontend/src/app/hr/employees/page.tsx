@@ -91,10 +91,22 @@ export default function EmployeesListPage() {
   });
 
   const changeManagerMutation = useMutation({
-    mutationFn: ({ id, manager }: { id: string; manager: string }) =>
-      api.employees.changeManager(id, { manager }),
+    mutationFn: ({
+      id,
+      manager,
+      effective_date,
+    }: {
+      id: string;
+      manager: string;
+      effective_date?: string;
+    }) =>
+      api.employees.changeManager(id, {
+        manager,
+        effective_date: effective_date || new Date().toISOString().split("T")[0],
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["manager-candidates"] });
       setChangeManagerEmp(null);
       setNewManagerId("");
     },
@@ -421,7 +433,15 @@ export default function EmployeesListPage() {
 
       {/* Change Manager Dialog */}
       {changeManagerEmp && (
-        <Dialog open={!!changeManagerEmp} onOpenChange={(open) => !open && setChangeManagerEmp(null)}>
+        <Dialog
+          open={!!changeManagerEmp}
+          onOpenChange={(open) => {
+            if (!open) {
+              setChangeManagerEmp(null);
+              changeManagerMutation.reset();
+            }
+          }}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Change Manager for {changeManagerEmp.name}</DialogTitle>
@@ -429,6 +449,14 @@ export default function EmployeesListPage() {
                 Assign a new manager. The system checks reporting hierarchy to prevent circular dependencies.
               </DialogDescription>
             </DialogHeader>
+
+            {changeManagerMutation.isError && (
+              <div className="mt-2 p-2.5 rounded-md bg-rose-50 border border-rose-200 text-xs text-rose-700 font-medium">
+                {changeManagerMutation.error instanceof Error
+                  ? changeManagerMutation.error.message
+                  : "Failed to update manager."}
+              </div>
+            )}
 
             <div className="py-4 space-y-3">
               <label className="text-xs font-semibold text-slate-700 block">Select New Manager</label>
@@ -459,6 +487,7 @@ export default function EmployeesListPage() {
                   changeManagerMutation.mutate({
                     id: changeManagerEmp.id,
                     manager: newManagerId,
+                    effective_date: new Date().toISOString().split("T")[0],
                   })
                 }
               >

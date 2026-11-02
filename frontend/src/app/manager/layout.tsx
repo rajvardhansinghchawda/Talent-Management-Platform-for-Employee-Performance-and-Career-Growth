@@ -12,7 +12,7 @@ export default function ManagerLayout({
   children: React.ReactNode;
 }) {
   return (
-    <PortalGuard allowedRoles={["MANAGER", "HR_ADMIN"]}>
+    <PortalGuard allowedRoles={["MANAGER"]}>
       <div className="flex min-h-screen bg-slate-50/50">
         {/* 9-item Left Vertical Manager Sidebar */}
         <ManagerSidebar />

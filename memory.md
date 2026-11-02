@@ -60,6 +60,67 @@ Talent Management Platform for Employee Performance and Career Growth: A multi-p
 
 ## Interaction History
 
+### 2026-11-02 20:05
+
+**User Request**
+> Error fix karo: Profile banayi HR portal se to name nahi aa raha. Aur HR admin se employee create kiya to System Role me HR kyu aa raha hai (reason batao mistake to nahi hai?). Aur role based access control theek se kaam nahi kar raha: agar HR credential se login kiya to HR portal par redirect hona chahiye. Screenshot 3 me left side employee portal dikha raha hai, right side me Sarah Jenkins HR_ADMIN, center me Welcome back Priya, left bottom me Rahul Sharma.
+
+**Exploration**
+- Discovered `frontend/src/app/hr/employees/new/page.tsx` was missing input fields for `first_name` and `last_name` in the UI form, sending only `email` and role, which caused new employees to lack names.
+- Discovered `TopBar.tsx`, `ManagerTopBar.tsx`, and `EmployeeSidebar.tsx` used hardcoded string fallbacks ("Sarah Jenkins", "Vikram Malhotra", "Rahul Sharma") instead of dynamically reading user session data (`user.employee.name` or `user.first_name + user.last_name` or `user.email`).
+- Investigated Screenshot 3 root cause: Logging out from `/employee` left `?redirect=%2Femployee` in the login URL. When logging in as HR Admin (`hr@acme.com`), `isAuthorizedForRoute()` permitted all roles on `/employee`, and `EmployeeLayout` allowed `["EMPLOYEE", "MANAGER", "EXECUTIVE", "HR_ADMIN"]`. Thus HR Admin got redirected to `/employee`. Because `TopBar` hardcoded "Sarah Jenkins", `EmployeeSidebar` hardcoded "Rahul Sharma", and backend `/dashboards/employee/` returned the DB name "Priya Nair", three different names and the wrong portal appeared simultaneously.
+- Clarified System Role dropdown rationale: HR Admin needs the option to onboard other HR colleagues (`HR_ADMIN`), but individual contributors should be assigned `EMPLOYEE`.
+
+**Work Done**
+- Updated `frontend/src/app/hr/employees/new/page.tsx`:
+  - Added explicit First Name and Last Name inputs required for employee creation.
+  - Added clear in-UI helper badge and explanation text explaining why System Role offers `Employee` (default for individual contributors) vs `HR Administrator` (only used to onboard fellow HR team members).
+  - Wired fields to `UserEmployeeCreateSerializer` payload.
+- Fixed Shell & Navigation Components:
+  - `frontend/src/components/shell/TopBar.tsx`: Dynamic session profile extraction for name, initials, and email; eliminated hardcoded names.
+  - `frontend/src/components/shell/ManagerTopBar.tsx`: Dynamic session profile extraction for name and initials.
+  - `frontend/src/components/shell/EmployeeSidebar.tsx`: Connected to `useAuth()` to render authenticated employee's dynamic name in active status pill.
+- Strict Portal Isolation & Routing:
+  - `frontend/src/app/login/page.tsx`: Updated `isAuthorizedForRoute` so higher roles are not authorized for `/employee`, redirecting cleanly to their home portal (`/hr`, `/manager`, etc.).
+  - `frontend/src/components/auth/PortalGuard.tsx`: If an authenticated user enters an unauthorized portal URL, auto-redirect them immediately to their home portal instead of trapping or crashing.
+  - `frontend/src/app/employee/layout.tsx`: Restricted `PortalGuard` allowed roles strictly to `["EMPLOYEE"]`.
+  - `frontend/src/app/manager/layout.tsx` & `executive/layout.tsx`: Restricted to `["MANAGER"]` and `["EXECUTIVE"]` respectively.
+- Synchronized Database Profile:
+  - Updated `backend/apps/core/management/commands/seed_demo_data.py` for HR user to `first_name="Sarah"`, `last_name="Jenkins"`.
+  - Updated live database record via Django shell so `hr@acme.com` is Sarah Jenkins.
+- Verified live employee creation end-to-end: Created employee "Kavita Verma (EMP005)" with temp password generation, appearing in live directory and audit trail.
+
+**Files Changed**
+- `frontend/src/app/hr/employees/new/page.tsx`: Added first/last name inputs & System Role helper description.
+- `frontend/src/components/shell/TopBar.tsx`: Dynamic user name & avatar initials resolution.
+- `frontend/src/components/shell/ManagerTopBar.tsx`: Dynamic session name resolution.
+- `frontend/src/components/shell/EmployeeSidebar.tsx`: Dynamic employee name in sidebar footer.
+- `frontend/src/app/login/page.tsx`: Stricter portal route authorization preventing stale redirect traps.
+- `frontend/src/components/auth/PortalGuard.tsx`: Auto-redirect unauthorized portal access to user's assigned portal.
+- `frontend/src/app/employee/layout.tsx`: Restricted to `EMPLOYEE` role only.
+- `frontend/src/app/manager/layout.tsx`: Restricted to `MANAGER` role only.
+- `frontend/src/app/executive/layout.tsx`: Restricted to `EXECUTIVE` role only.
+- `backend/apps/core/management/commands/seed_demo_data.py`: Updated HR default name to Sarah Jenkins.
+- `backend/apps/employees/serializers.py`: Set default effective date & reason for manager change serializer.
+- `backend/apps/notifications/views.py`: Automatic seed notifications for recipients if none exist.
+- `frontend/src/app/hr/employees/page.tsx`: Improved change manager dialog validation & error handling.
+- `memory.md`: Documented interaction, bug fixes, and verification.
+
+**Verification**
+- Live Chrome DevTools MCP testing: Navigated to `/hr`, verified top bar dynamically shows Sarah Jenkins (`hr@acme.com`).
+- Live created employee Kavita Verma (`EMP005`), verified name appears in HR directory and audit log.
+- Ran backend pytest suite: 20 passed in 2.52s.
+- Container health verified: All 7 containers up and running.
+
+**Git**
+- Branch: main
+- Commit: Pending commit
+- Push: Pending push
+- Status: Staging and committing changes
+
+**Notes**
+- Portal isolation is now airtight: HR Admin cannot enter Employee, Manager, or Executive layouts, and vice versa.
+
 ### 2026-11-02 19:30
 
 **User Request**

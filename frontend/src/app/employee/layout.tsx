@@ -12,7 +12,7 @@ export default function EmployeeLayout({
   children: React.ReactNode;
 }) {
   return (
-    <PortalGuard allowedRoles={["EMPLOYEE", "MANAGER", "EXECUTIVE", "HR_ADMIN"]}>
+    <PortalGuard allowedRoles={["EMPLOYEE"]}>
       <div className="flex min-h-screen bg-slate-50/50">
         {/* 13-item Employee Sidebar */}
         <EmployeeSidebar />

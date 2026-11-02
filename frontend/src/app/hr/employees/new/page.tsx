@@ -24,6 +24,8 @@ export default function AddEmployeePage() {
   const queryClient = useQueryClient();
 
   // Form state
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("EMPLOYEE");
   const [credentialMode, setCredentialMode] = useState<"INVITE" | "TEMP_PASSWORD">("TEMP_PASSWORD");
@@ -85,8 +87,8 @@ export default function AddEmployeePage() {
     e.preventDefault();
     setFormError(null);
 
-    if (!email || !employeeCode) {
-      setFormError("Email and Employee Code are required.");
+    if (!email || !employeeCode || !firstName) {
+      setFormError("First Name, Email, and Employee Code are required.");
       return;
     }
 
@@ -94,13 +96,17 @@ export default function AddEmployeePage() {
       email,
       role,
       credential_mode: credentialMode,
+      first_name: firstName,
+      last_name: lastName,
       employee: {
         employee_code: employeeCode,
+        first_name: firstName,
+        last_name: lastName,
         department: departmentId || null,
         job_role: jobRoleId || null,
         manager: managerId || null,
         joining_date: joiningDate,
-        preferred_name: preferredName || undefined,
+        preferred_name: preferredName || firstName,
         phone: phone || undefined,
         location: location || undefined,
       },
@@ -142,6 +148,25 @@ export default function AddEmployeePage() {
           </CardHeader>
           <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">First Name *</label>
+              <Input
+                placeholder="e.g. Rahul"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">Last Name</label>
+              <Input
+                placeholder="e.g. Sharma"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700">Company Email Address *</label>
               <Input
                 type="email"
@@ -153,7 +178,10 @@ export default function AddEmployeePage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">System Role *</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-700">System Role *</label>
+                <span className="text-[10px] text-slate-400">Portal Access Level</span>
+              </div>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
@@ -161,9 +189,12 @@ export default function AddEmployeePage() {
               >
                 <option value="EMPLOYEE">Employee (Individual Contributor)</option>
                 <option value="MANAGER">Manager (People Leader)</option>
-                <option value="HR_ADMIN">HR Administrator</option>
+                <option value="HR_ADMIN">HR Administrator (HR Team Member)</option>
                 <option value="EXECUTIVE">Executive (Leadership & Succession)</option>
               </select>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Select &#39;Employee&#39; for standard team members, or &#39;HR Administrator&#39; only if onboarding an HR team colleague.
+              </p>
             </div>
 
             <div className="space-y-1.5 md:col-span-2">

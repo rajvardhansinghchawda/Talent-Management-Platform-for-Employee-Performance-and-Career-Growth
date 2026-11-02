@@ -44,6 +44,14 @@ export function ManagerTopBar() {
       queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
     },
   });
+
+  const markReadMutation = useMutation({
+    mutationFn: (id: string) => fetchApi(`/notifications/${id}/read/`, { method: "POST" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["manager-notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
+    },
+  });
   return (
     <header className="h-16 border-b border-slate-200 bg-white sticky top-0 z-20 flex items-center justify-between px-4 sm:px-6">
       {/* Left controls: Hamburger on mobile + Search */}
@@ -110,14 +118,28 @@ export function ManagerTopBar() {
               </div>
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {Array.isArray(notifications) && notifications.length > 0 ? (
-                  notifications.slice(0, 4).map((n) => (
+                  notifications.slice(0, 5).map((n) => (
                     <div
                       key={n.id}
-                      className={`p-2 rounded-md border transition-colors ${
-                        n.is_read ? "bg-white border-slate-100" : "bg-emerald-50/50 border-emerald-100 font-medium"
+                      onClick={() => {
+                        if (!n.is_read) {
+                          markReadMutation.mutate(n.id);
+                        }
+                        setNotificationsOpen(false);
+                        if (n.link) {
+                          router.push(n.link);
+                        }
+                      }}
+                      className={`p-2.5 rounded-lg border transition-all cursor-pointer hover:shadow-xs ${
+                        n.is_read
+                          ? "bg-white border-slate-100 hover:bg-slate-50"
+                          : "bg-indigo-50/60 border-indigo-200 hover:bg-indigo-50 font-medium"
                       }`}
                     >
-                      <p className="font-semibold text-slate-900 leading-tight">{n.title}</p>
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="font-semibold text-slate-900 leading-tight truncate">{n.title}</p>
+                        {!n.is_read && <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />}
+                      </div>
                       <p className="text-slate-500 text-[11px] mt-0.5 line-clamp-2">{n.body}</p>
                     </div>
                   ))
@@ -148,40 +170,56 @@ export function ManagerTopBar() {
 
         {/* Profile Avatar & Menu */}
         <div className="relative">
-          <button
-            onClick={() => setProfileOpen(!profileOpen)}
-            className="flex items-center space-x-2.5 p-1 rounded-full hover:bg-slate-100 transition-colors"
-          >
-            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-semibold flex items-center justify-center text-xs border border-emerald-200">
-              {user?.first_name?.[0] || "V"}{user?.last_name?.[0] || "M"}
-            </div>
-            <div className="hidden lg:flex flex-col text-left">
-              <span className="text-xs font-semibold text-slate-900 leading-none">
-                {user?.first_name ? `${user.first_name} ${user.last_name}` : "Vikram Malhotra"}
-              </span>
-              <span className="text-[10px] text-emerald-600 font-semibold leading-none mt-1">
-                People Manager
-              </span>
-            </div>
-          </button>
+          {(() => {
+            const displayName =
+              (user as any)?.employee?.name ||
+              (user as any)?.employee?.preferred_name ||
+              (user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : null) ||
+              (user?.email ? user.email.split("@")[0].replace(".", " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Manager");
 
-          {profileOpen && (
-            <div className="absolute right-0 mt-2 w-56 rounded-lg border border-slate-200 bg-white shadow-lg py-1.5 z-50 text-xs text-slate-700">
-              <div className="px-3 py-2 border-b border-slate-100 mb-1">
-                <p className="font-semibold text-slate-900">
-                  {user?.first_name ? `${user.first_name} ${user.last_name}` : "Vikram Malhotra"}
-                </p>
-                <p className="text-slate-500 truncate text-[11px]">{user?.email || "manager@acme.com"}</p>
-              </div>
+            const initials =
+              displayName
+                .split(" ")
+                .filter(Boolean)
+                .map((n: string) => n[0])
+                .slice(0, 2)
+                .join("")
+                .toUpperCase() || "M";
 
-              <Link
-                href="/hr"
-                onClick={() => setProfileOpen(false)}
-                className="flex items-center px-3 py-2 hover:bg-slate-50 transition-colors text-slate-700"
-              >
-                <ArrowRightLeft className="w-3.5 h-3.5 mr-2 text-indigo-500" />
-                Switch to HR Admin Portal
-              </Link>
+            return (
+              <>
+                <button
+                  onClick={() => setProfileOpen(!profileOpen)}
+                  className="flex items-center space-x-2.5 p-1 rounded-full hover:bg-slate-100 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-semibold flex items-center justify-center text-xs border border-emerald-200">
+                    {initials}
+                  </div>
+                  <div className="hidden lg:flex flex-col text-left">
+                    <span className="text-xs font-semibold text-slate-900 leading-none">
+                      {displayName}
+                    </span>
+                    <span className="text-[10px] text-emerald-600 font-semibold leading-none mt-1">
+                      {user?.role === "HR_ADMIN" ? "HR Admin" : "People Manager"}
+                    </span>
+                  </div>
+                </button>
+
+                {profileOpen && (
+                  <div className="absolute right-0 mt-2 w-56 rounded-lg border border-slate-200 bg-white shadow-lg py-1.5 z-50 text-xs text-slate-700">
+                    <div className="px-3 py-2 border-b border-slate-100 mb-1">
+                      <p className="font-semibold text-slate-900">{displayName}</p>
+                      <p className="text-slate-500 truncate text-[11px]">{user?.email || "manager@acme.com"}</p>
+                    </div>
+
+                    <Link
+                      href="/hr"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center px-3 py-2 hover:bg-slate-50 transition-colors text-slate-700"
+                    >
+                      <ArrowRightLeft className="w-3.5 h-3.5 mr-2 text-indigo-500" />
+                      Switch to HR Admin Portal
+                    </Link>
               <Link
                 href="/notifications"
                 onClick={() => setProfileOpen(false)}

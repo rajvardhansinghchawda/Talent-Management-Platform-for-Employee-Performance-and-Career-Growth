@@ -188,8 +188,8 @@ class Command(BaseCommand):
             user=hr_user,
             defaults={
                 "employee_code": "EMP001",
-                "first_name": "Priya",
-                "last_name": "Nair",
+                "first_name": "Sarah",
+                "last_name": "Jenkins",
                 "department": departments["Engineering"],
                 "joining_date": timezone.now().date(),
                 "employment_status": EmploymentStatus.ACTIVE,

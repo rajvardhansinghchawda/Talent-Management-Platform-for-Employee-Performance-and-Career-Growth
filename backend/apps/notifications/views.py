@@ -19,15 +19,8 @@ class NotificationListView(APIView):
         is_read_param = request.query_params.get("is_read")
         category = request.query_params.get("category")
 
-        qs = Notification.objects.filter(recipient=request.user)
-        if is_read_param is not None:
-            is_read = is_read_param.lower() in ("true", "1")
-            qs = qs.filter(is_read=is_read)
-        if category:
-            qs = qs.filter(category=category)
-
-        # Seed some demo notifications if none exist
-        if not qs.exists():
+        # Seed initial demo notifications if recipient has none at all
+        if not Notification.objects.filter(recipient=request.user).exists():
             Notification.objects.create(
                 recipient=request.user,
                 category=NotificationCategory.CYCLE_STARTED,
@@ -53,8 +46,13 @@ class NotificationListView(APIView):
                 is_read=True,
                 read_at=timezone.now(),
             )
-            qs = Notification.objects.filter(recipient=request.user)
 
+        qs = Notification.objects.filter(recipient=request.user)
+        if is_read_param is not None:
+            is_read = is_read_param.lower() in ("true", "1")
+            qs = qs.filter(is_read=is_read)
+        if category:
+            qs = qs.filter(category=category)
         data = [
             {
                 "id": str(n.id),
@@ -132,16 +130,23 @@ class NotificationPreferencesView(APIView):
         return Response(data)
 
     def patch(self, request: Request) -> Response:
-        items = request.data.get("preferences", [])
+        raw = request.data
+        items = raw.get("preferences") if isinstance(raw, dict) else raw
+        if not isinstance(items, list):
+            items = []
         for item in items:
-            cat = item.get("category")
-            if cat:
-                NotificationPreference.objects.update_or_create(
-                    user=request.user,
-                    category=cat,
-                    defaults={
-                        "email_enabled": item.get("email_enabled", True),
-                        "in_app_enabled": item.get("in_app_enabled", True),
-                    },
-                )
+            if isinstance(item, dict):
+                cat = item.get("category")
+                if cat:
+                    NotificationPreference.objects.update_or_create(
+                        user=request.user,
+                        category=cat,
+                        defaults={
+                            "email_enabled": item.get("email_enabled", True),
+                            "in_app_enabled": item.get("in_app_enabled", True),
+                        },
+                    )
         return self.get(request)
+
+    def put(self, request: Request) -> Response:
+        return self.patch(request)

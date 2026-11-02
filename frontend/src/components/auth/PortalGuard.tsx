@@ -30,7 +30,16 @@ export function PortalGuard({ allowedRoles, children }: PortalGuardProps) {
     }
 
     if (!allowedRoles.includes(user.role)) {
-      router.replace("/forbidden");
+      if (user.role === "HR_ADMIN") {
+        router.replace("/hr");
+      } else if (user.role === "MANAGER") {
+        router.replace("/manager");
+      } else if (user.role === "EXECUTIVE") {
+        router.replace("/executive");
+      } else {
+        router.replace("/forbidden");
+      }
+      return;
     }
   }, [user, loading, allowedRoles, pathname, router]);
 

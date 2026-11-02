@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth/AuthContext";
 import {
   LayoutDashboard,
   Target,
@@ -41,6 +42,13 @@ const employeeNavItems = [
 export function EmployeeSidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const { user } = useAuth();
+
+  const displayName =
+    (user as any)?.employee?.name ||
+    (user as any)?.employee?.preferred_name ||
+    (user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : null) ||
+    (user?.email ? user.email.split("@")[0].replace(".", " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Employee");
 
   return (
     <aside
@@ -119,7 +127,7 @@ export function EmployeeSidebar() {
         <div className="p-4 border-t border-slate-100 bg-slate-50/50">
           <div className="flex items-center space-x-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-xs text-slate-500 font-medium">Rahul Sharma · Active</span>
+            <span className="text-xs text-slate-500 font-medium">{displayName} · Active</span>
           </div>
         </div>
       )}

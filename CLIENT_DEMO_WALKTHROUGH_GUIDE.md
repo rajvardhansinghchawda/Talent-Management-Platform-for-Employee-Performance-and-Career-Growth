@@ -255,3 +255,4 @@
 > **Say to Client:**  
 > *"To summarize: TalentPulse doesn't just digitize HR paperwork. It gives your leadership a real-time talent operating system. Employees get transparent career paths, managers save hours with AI-assisted reviews, HR gains total governance with calibration and audit trails, and executives get succession readiness data they can trust.*  
 > *We can deploy this seamlessly for your organization today."*
+

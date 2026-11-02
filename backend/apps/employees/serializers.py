@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.models import User
@@ -186,5 +187,5 @@ class ChangeManagerSerializer(serializers.Serializer):
     manager = serializers.PrimaryKeyRelatedField(
         queryset=Employee.objects.filter(is_active=True), allow_null=True
     )
-    effective_date = serializers.DateField()
-    reason = serializers.CharField(required=False, allow_blank=True)
+    effective_date = serializers.DateField(required=False, default=timezone.now().date)
+    reason = serializers.CharField(required=False, allow_blank=True, default="")

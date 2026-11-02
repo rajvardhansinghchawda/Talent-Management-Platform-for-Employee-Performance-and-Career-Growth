@@ -24,10 +24,11 @@ function LoginForm() {
 
   function isAuthorizedForRoute(role: string, targetPath: string): boolean {
     if (targetPath.startsWith("/hr")) return role === "HR_ADMIN";
-    if (targetPath.startsWith("/manager")) return role === "MANAGER" || role === "HR_ADMIN";
-    if (targetPath.startsWith("/executive")) return role === "EXECUTIVE" || role === "HR_ADMIN";
-    if (targetPath.startsWith("/employee")) return true;
-    return true;
+    if (targetPath.startsWith("/manager")) return role === "MANAGER";
+    if (targetPath.startsWith("/executive")) return role === "EXECUTIVE";
+    if (targetPath.startsWith("/employee")) return role === "EMPLOYEE";
+    if (targetPath.startsWith("/notifications") || targetPath.startsWith("/settings") || targetPath === "/change-password") return true;
+    return false;
   }
 
   function getDefaultPortal(role: string): string {
