@@ -260,6 +260,9 @@ export function ManagerTopBar() {
               </button>
             </div>
           )}
+        </>
+      );
+    })()}
         </div>
       </div>
     </header>

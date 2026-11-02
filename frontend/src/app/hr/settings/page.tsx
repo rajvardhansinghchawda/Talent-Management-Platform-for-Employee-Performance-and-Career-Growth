@@ -13,8 +13,11 @@ import {
   CheckCircle2,
   AlertTriangle,
   Lock,
+  Bell,
+  Mail,
+  SlidersHorizontal,
 } from "lucide-react";
-import { api } from "@/lib/api/client";
+import { api, fetchApi } from "@/lib/api/client";
 import type { OrganizationSettings, User } from "@/lib/api/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,8 +53,52 @@ export default function SettingsPage() {
   const [provisionalSkills, setProvisionalSkills] = useState(true);
   const [confidentialFeedback, setConfidentialFeedback] = useState(true);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [alertPrefs, setAlertPrefs] = useState<
+    Array<{
+      category: string;
+      category_label: string;
+      email_enabled: boolean;
+      in_app_enabled: boolean;
+    }>
+  >([]);
+  const [alertPrefSaved, setAlertPrefSaved] = useState(false);
 
-  // Sync state once query resolves
+  const { data: prefData } = useQuery({
+    queryKey: ["hr-alert-preferences"],
+    queryFn: async () => {
+      const data = await fetchApi<
+        Array<{
+          category: string;
+          category_label: string;
+          email_enabled: boolean;
+          in_app_enabled: boolean;
+        }>
+      >("/notifications/preferences/");
+      setAlertPrefs(data);
+      return data;
+    },
+  });
+
+  const saveAlertPrefMutation = useMutation({
+    mutationFn: (
+      updated: Array<{
+        category: string;
+        category_label: string;
+        email_enabled: boolean;
+        in_app_enabled: boolean;
+      }>
+    ) =>
+      fetchApi("/notifications/preferences/", {
+        method: "PATCH",
+        body: JSON.stringify({ preferences: updated }),
+      }),
+    onSuccess: (data: any) => {
+      queryClient.setQueryData(["hr-alert-preferences"], data);
+      if (Array.isArray(data)) setAlertPrefs(data);
+      setAlertPrefSaved(true);
+      setTimeout(() => setAlertPrefSaved(false), 3000);
+    },
+  });
   React.useEffect(() => {
     if (settingsData) {
       if (settingsData.general?.name) setOrgName(settingsData.general.name);
@@ -284,6 +331,82 @@ export default function SettingsPage() {
             <p className="text-[11px] text-slate-500 pl-6 leading-relaxed">
               Confidential feedback is stripped at the DRF serializer level and never transmitted to employee portal clients.
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Alert & Notification Preferences */}
+      <Card>
+        <CardHeader className="p-6 pb-4 border-b border-slate-100 flex flex-row items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <Bell className="w-5 h-5 text-indigo-600" />
+            <div>
+              <CardTitle className="text-sm font-bold text-slate-900">Alert & Notification Preferences</CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Configure default email alerts and in-app notifications for system events
+              </CardDescription>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => saveAlertPrefMutation.mutate(alertPrefs)}
+            disabled={saveAlertPrefMutation.isPending}
+            className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+          >
+            <Save className="w-3.5 h-3.5 mr-1" />
+            {saveAlertPrefMutation.isPending ? "Saving..." : "Save Preferences"}
+          </Button>
+        </CardHeader>
+        <CardContent className="p-6 space-y-4">
+          {alertPrefSaved && (
+            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center space-x-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Alert preferences saved successfully!</span>
+            </div>
+          )}
+
+          <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden bg-white text-xs">
+            <div className="grid grid-cols-12 bg-slate-50 p-3 font-semibold text-slate-700">
+              <div className="col-span-6 sm:col-span-8">Event Category</div>
+              <div className="col-span-3 sm:col-span-2 text-center">In-App Alert</div>
+              <div className="col-span-3 sm:col-span-2 text-center">Email Alert</div>
+            </div>
+            {alertPrefs.map((pref) => (
+              <div key={pref.category} className="grid grid-cols-12 p-3 items-center hover:bg-slate-50/50 transition-colors">
+                <div className="col-span-6 sm:col-span-8">
+                  <span className="font-semibold text-slate-900 block">{pref.category_label}</span>
+                  <span className="text-[10px] text-slate-400 font-mono">{pref.category}</span>
+                </div>
+                <div className="col-span-3 sm:col-span-2 flex justify-center">
+                  <input
+                    type="checkbox"
+                    checked={pref.in_app_enabled}
+                    onChange={() =>
+                      setAlertPrefs((prev) =>
+                        prev.map((p) =>
+                          p.category === pref.category ? { ...p, in_app_enabled: !p.in_app_enabled } : p
+                        )
+                      )
+                    }
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+                </div>
+                <div className="col-span-3 sm:col-span-2 flex justify-center">
+                  <input
+                    type="checkbox"
+                    checked={pref.email_enabled}
+                    onChange={() =>
+                      setAlertPrefs((prev) =>
+                        prev.map((p) =>
+                          p.category === pref.category ? { ...p, email_enabled: !p.email_enabled } : p
+                        )
+                      )
+                    }
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

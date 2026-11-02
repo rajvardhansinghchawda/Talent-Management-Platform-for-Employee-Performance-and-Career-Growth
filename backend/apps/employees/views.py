@@ -6,6 +6,8 @@ import csv
 import io
 import uuid
 
+from django.core.cache import cache
+from django.core.files.base import ContentFile
 from django.db.models import Q
 from django.http import HttpResponse
 from rest_framework import status
@@ -392,7 +394,7 @@ class EmployeeReactivateView(APIView):
 class EmployeeImportTemplateView(APIView):
     """GET /api/v1/employees/import/template/ — Download sample CSV template."""
 
-    permission_classes = [HasRole.hr_admin()]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> HttpResponse:
         response = HttpResponse(content_type="text/csv")
@@ -494,6 +496,7 @@ class EmployeeImportPreviewView(APIView):
                 preview_rows.append(row)
 
         upload_id = str(uuid.uuid4())
+        cache.set(f"import_csv_{upload_id}", content, timeout=3600)
 
         return Response(
             {
@@ -517,8 +520,15 @@ class EmployeeImportCommitView(APIView):
     def post(self, request: Request) -> Response:
         file_obj = request.FILES.get("file")
         if not file_obj:
+            upload_id = request.data.get("upload_id")
+            if upload_id:
+                cached_content = cache.get(f"import_csv_{upload_id}")
+                if cached_content:
+                    file_obj = ContentFile(cached_content.encode("utf-8"), name=f"import_{upload_id}.csv")
+
+        if not file_obj:
             return Response(
-                {"error": {"code": "validation_error", "message": "CSV file required for commit."}},
+                {"error": {"code": "validation_error", "message": "CSV file or valid upload_id required for commit."}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -531,7 +541,10 @@ class EmployeeImportCommitView(APIView):
 
         from .tasks import run_employee_import
 
-        run_employee_import.delay(str(job.id))
+        try:
+            run_employee_import.delay(str(job.id))
+        except Exception:
+            run_employee_import(str(job.id))
 
         return Response(
             {"job_id": str(job.id), "status": job.status},

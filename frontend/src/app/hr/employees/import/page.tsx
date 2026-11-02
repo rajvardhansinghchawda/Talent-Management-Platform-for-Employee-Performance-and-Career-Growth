@@ -76,7 +76,20 @@ export default function EmployeeImportPage() {
       setSelectedFile(e.target.files[0]);
     }
   };
-
+  const handleDownloadTemplate = () => {
+    const csvContent =
+      "employee_code,email,first_name,last_name,department,job_role,manager_employee_code,joining_date,location\n" +
+      "EMP001,rahul.sharma@example.com,Rahul,Sharma,Engineering,Junior Python Developer,,2024-01-15,Bengaluru\n";
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "employee_import_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
@@ -144,12 +157,16 @@ export default function EmployeeImportPage() {
                   </p>
                 </div>
               </div>
-              <a href={api.employees.importTemplateUrl()} download="employee_import_template.csv">
-                <Button variant="outline" size="sm" className="bg-white text-xs shrink-0">
-                  <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
-                  Download CSV Template
-                </Button>
-              </a>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadTemplate}
+                className="bg-white text-xs shrink-0 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-600" />
+                Download CSV Template
+              </Button>
             </CardContent>
           </Card>
 
@@ -159,6 +176,7 @@ export default function EmployeeImportPage() {
               <div
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleFileDrop}
+                onClick={() => document.getElementById("csv-file-input")?.click()}
                 className="border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-slate-50/50"
               >
                 <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 mb-3">
@@ -177,16 +195,18 @@ export default function EmployeeImportPage() {
                     onChange={handleFileSelect}
                     className="hidden"
                   />
-                  <label htmlFor="csv-file-input">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="bg-white text-xs cursor-pointer pointer-events-none"
-                    >
-                      Browse File
-                    </Button>
-                  </label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      document.getElementById("csv-file-input")?.click();
+                    }}
+                    className="bg-white text-xs cursor-pointer"
+                  >
+                    Browse File
+                  </Button>
                 </div>
 
                 {selectedFile && (
@@ -288,6 +308,14 @@ export default function EmployeeImportPage() {
                   </Table>
                 </div>
               </div>
+
+              {commitMutation.isError && (
+                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 font-medium">
+                  {commitMutation.error instanceof Error
+                    ? commitMutation.error.message
+                    : "Failed to process import job."}
+                </div>
+              )}
 
               {/* Commit Actions */}
               <div className="flex items-center justify-between pt-4 border-t border-slate-100">
