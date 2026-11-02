@@ -60,6 +60,43 @@ Talent Management Platform for Employee Performance and Career Growth: A multi-p
 
 ## Interaction History
 
+### 2026-11-02 18:30
+
+**User Request**
+> make the website fully responsive and adjusable in all devices like phone , laptop , ipad , tablets , pc etc so it give a smooth experiance to the user , also if any button or icon or anything break and not align according to the theme also fix it , and one more think make it attrative
+
+**Exploration & Strategy**
+- Audited viewport breakpoints across all 4 portals (Phone: 390px, Tablet: 768px, Laptop: 1024px, PC Widescreen: 1440px).
+- Identified that wide tabular interfaces in HR Admin and Manager portals overflowed horizontally on mobile screens, and the fixed desktop sidebar needed a responsive slide-over drawer on devices under 1024px (`< lg`).
+- Designed dual desktop-table and mobile-card layouts across all data views: on desktop (`lg:block`), rendered rich multi-column tables; on mobile and tablet (`block lg:hidden`), rendered stacked cards with avatar chips, role/department badges, progress bars, and accessible action buttons.
+
+**Work Done**
+- Added responsive slide-over mobile navigation drawer with backdrop overlay in `frontend/src/components/shell/MobileNavContext.tsx`, `Sidebar.tsx`, and `ManagerSidebar.tsx`.
+- Updated `TopBar.tsx` and `ManagerTopBar.tsx` with responsive hamburger toggle (`Menu` icon with `aria-label="Open mobile menu"`), adaptive search input width (`w-36 sm:w-56 md:w-72`), and compact user chips.
+- Implemented dual desktop-table and mobile-card layout across:
+  - `frontend/src/app/hr/employees/page.tsx`
+  - `frontend/src/app/hr/roles/page.tsx`
+  - `frontend/src/app/hr/skills/page.tsx`
+  - `frontend/src/app/hr/courses/page.tsx`
+  - `frontend/src/app/hr/review-cycles/page.tsx`
+  - `frontend/src/app/hr/calibration/page.tsx`
+  - `frontend/src/app/hr/reports/page.tsx`
+  - `frontend/src/app/hr/audit-logs/page.tsx`
+  - `frontend/src/app/hr/departments/page.tsx` (responsive indentation and padding)
+  - `frontend/src/app/manager/team/page.tsx`
+  - `frontend/src/app/manager/goals/page.tsx`
+  - `frontend/src/app/manager/reviews/page.tsx`
+  - `frontend/src/app/manager/reviews/[id]/page.tsx` (responsive evaluation form and stepper pill)
+  - `frontend/src/app/manager/skill-validation/page.tsx`
+  - `frontend/src/app/manager/development-plans/page.tsx`
+  - `frontend/src/app/manager/team/[id]/page.tsx` (horizontally scrollable tab bar and responsive header)
+  - `frontend/src/app/manager/one-on-ones/page.tsx` (responsive meeting list and notes editor)
+- Verified TypeScript types (`npm run type-check`: 0 errors) and Next.js production build (`npm run build`: 54/54 static and dynamic routes compiled).
+- Executed visual browser verification across all three form factors:
+  - **Phone (390x844)**: Captured live screenshots of Manager Dashboard, My Team stacked cards, HR Employees stacked cards, and open Mobile Drawer.
+  - **Tablet (768x1024)**: Verified responsive card stacking and padding on iPad viewport.
+  - **PC Widescreen (1440x900)**: Verified persistent sidebars and widescreen data tables.
+
 ### 2026-11-02 16:45
 
 **User Request**

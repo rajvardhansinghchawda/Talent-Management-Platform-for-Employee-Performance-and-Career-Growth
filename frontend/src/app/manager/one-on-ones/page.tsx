@@ -175,7 +175,7 @@ export default function OneOnOnesPage() {
         <div className="lg:col-span-2">
           {selectedMeeting ? (
             <Card>
-              <CardHeader className="p-6 pb-4 border-b border-slate-100 flex flex-row items-center justify-between">
+              <CardHeader className="p-4 sm:p-6 pb-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <CardTitle className="text-base font-bold text-slate-900">
                     1:1 Workspace · {selectedMeeting.employee_name}

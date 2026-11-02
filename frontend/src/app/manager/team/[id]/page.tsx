@@ -128,7 +128,7 @@ export default function TeamMemberDetailPage() {
       <Card>
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
               <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white font-bold text-xl flex items-center justify-center shadow-md">
                 {member.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
               </div>
@@ -164,7 +164,7 @@ export default function TeamMemberDetailPage() {
 
       {/* 7 Tabs Section */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="bg-slate-100 p-1 rounded-lg w-full justify-start overflow-x-auto">
+        <TabsList className="bg-slate-100 p-1 rounded-lg w-full justify-start overflow-x-auto flex-nowrap shrink-0 whitespace-nowrap min-w-0">
           <TabsTrigger value="overview">1. Overview</TabsTrigger>
           <TabsTrigger value="goals">2. Goals</TabsTrigger>
           <TabsTrigger value="reviews">3. Reviews</TabsTrigger>

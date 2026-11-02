@@ -108,7 +108,7 @@ export default function MyTeamPage() {
       ) : (
         <Card>
           {/* Desktop Table (md:block, hidden on mobile) */}
-          <div className="hidden md:block overflow-x-auto">
+          <div className="hidden lg:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -177,8 +177,8 @@ export default function MyTeamPage() {
             </Table>
           </div>
 
-          {/* Mobile Stacked Cards (< md) */}
-          <div className="block md:hidden divide-y divide-slate-100">
+          {/* Mobile & Tablet Stacked Cards (< lg) */}
+          <div className="block lg:hidden divide-y divide-slate-100">
             {team.map((member) => (
               <div key={member.id} className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">

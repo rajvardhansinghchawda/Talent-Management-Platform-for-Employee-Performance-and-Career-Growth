@@ -231,8 +231,8 @@ export default function CalibrationPage() {
         />
       ) : (
         <Card>
-          {/* Desktop Table (md:block, hidden on mobile) */}
-          <div className="hidden md:block overflow-x-auto">
+          {/* Desktop Table (lg:block, hidden on mobile/tablet) */}
+          <div className="hidden lg:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -304,8 +304,8 @@ export default function CalibrationPage() {
             </Table>
           </div>
 
-          {/* Mobile Stacked Cards (< md) */}
-          <div className="block md:hidden divide-y divide-slate-100">
+          {/* Mobile & Tablet Stacked Cards (< lg) */}
+          <div className="block lg:hidden divide-y divide-slate-100">
             {reviews.map((r) => (
               <div key={r.id} className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">

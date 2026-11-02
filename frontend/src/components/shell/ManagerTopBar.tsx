@@ -52,6 +52,7 @@ export function ManagerTopBar() {
           onClick={toggle}
           className="lg:hidden mr-2 p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
           title="Toggle Navigation Menu"
+          aria-label="Open mobile menu"
         >
           <Menu className="w-5 h-5" />
         </button>

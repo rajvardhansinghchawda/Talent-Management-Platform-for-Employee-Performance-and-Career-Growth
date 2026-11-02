@@ -216,7 +216,7 @@ export default function SkillValidationPage() {
                   <div>
                     <span className="font-bold text-slate-900 text-sm block">{item.employee_name}</span>
                     <span className="text-[11px] text-slate-500 font-mono">
-                      {item.employee_code} · {item.department_name}
+                      {item.employee_code} · {item.department}
                     </span>
                   </div>
                   <Badge variant="outline" className="text-xs font-bold text-indigo-700 bg-indigo-50 border-indigo-200">

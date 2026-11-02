@@ -125,7 +125,7 @@ export default function ManagerReviewFormPage() {
             </div>
 
             {/* Stepper Pill */}
-            <div className="flex items-center space-x-1.5 p-1 bg-slate-100 rounded-lg text-[11px] font-semibold text-slate-600">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-1 sm:gap-1.5 p-1 bg-slate-100 rounded-lg text-[11px] font-semibold text-slate-600">
               <span className="px-2 py-0.5 rounded bg-white text-slate-900 shadow-xs">1. Self Review</span>
               <span>→</span>
               <span className="px-2 py-0.5 rounded bg-indigo-600 text-white shadow-xs">2. Manager Review</span>
