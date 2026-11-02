@@ -125,7 +125,8 @@ export default function SkillValidationPage() {
         />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
+          {/* Desktop Table (md:block, hidden on mobile) */}
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -205,6 +206,68 @@ export default function SkillValidationPage() {
                 ))}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobile Stacked Cards (< md) */}
+          <div className="block md:hidden divide-y divide-slate-100">
+            {queue.map((item) => (
+              <div key={item.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="font-bold text-slate-900 text-sm block">{item.employee_name}</span>
+                    <span className="text-[11px] text-slate-500 font-mono">
+                      {item.employee_code} · {item.department_name}
+                    </span>
+                  </div>
+                  <Badge variant="outline" className="text-xs font-bold text-indigo-700 bg-indigo-50 border-indigo-200">
+                    Level {item.level} / 5
+                  </Badge>
+                </div>
+
+                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-900">{item.skill_name}</span>
+                    <Badge variant="secondary" className="text-[9px] uppercase font-mono">
+                      {item.source}
+                    </Badge>
+                  </div>
+                  {item.evidence_note && (
+                    <p className="text-slate-600 text-[11px] leading-relaxed pt-0.5">{item.evidence_note}</p>
+                  )}
+                  {item.evidence_url && (
+                    <a
+                      href={item.evidence_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] text-indigo-600 hover:underline flex items-center pt-1"
+                    >
+                      <ExternalLink className="w-2.5 h-2.5 mr-1" />
+                      View external work artifact
+                    </a>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end space-x-2 pt-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRejectItem(item)}
+                    className="h-8 px-3 text-rose-600 border-rose-200 hover:bg-rose-50 text-xs flex-1 sm:flex-initial"
+                  >
+                    <XCircle className="w-3.5 h-3.5 mr-1" />
+                    Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => openValidateModal(item)}
+                    className="h-8 px-3.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex-1 sm:flex-initial"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                    Validate
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}
