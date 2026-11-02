@@ -114,9 +114,9 @@ Talent Management Platform for Employee Performance and Career Growth: A multi-p
 
 **Git**
 - Branch: main
-- Commit: Pending commit
-- Push: Pending push
-- Status: Staging and committing changes
+- Commit: f085f93 ("fix: resolve role routing, dynamic user display names, and employee creation fields")
+- Push: Success (pushed to origin/main)
+- Status: Clean working tree
 
 **Notes**
 - Portal isolation is now airtight: HR Admin cannot enter Employee, Manager, or Executive layouts, and vice versa.
