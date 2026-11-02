@@ -60,6 +60,37 @@ Talent Management Platform for Employee Performance and Career Growth: A multi-p
 
 ## Interaction History
 
+### 2026-11-02 20:18
+
+**User Request**
+> Mujhe compose up and down karne ki need hai kya changes dekhne ke liye?
+
+**Exploration**
+- Checked `docker-compose.yml` configuration:
+  - `backend` volume is mapped directly (`./backend:/app`) and runs `python manage.py runserver`, which has built-in auto-reloading for Python files.
+  - `frontend` volume is mapped directly (`./frontend:/app`) with `WATCHPACK_POLLING: "true"` running `npm run dev`, which provides instant Hot Module Replacement (HMR).
+
+**Work Done**
+- Clarified to user that `docker compose down` / `docker compose up` is NOT needed.
+- Explained that a simple browser refresh (`F5` or `Ctrl + Shift + R`) will instantly reflect the changes.
+- Outlined the rare edge cases where a container restart or rebuild is actually required (e.g. installing new npm/pip packages or editing docker-compose configs).
+
+**Files Changed**
+- `memory.md`
+  - Documented interaction and runtime environment explanation.
+
+**Verification**
+- Verified live dev server responses and auto-reload behavior on port 3000 and 8000.
+
+**Response**
+- Explained in clear Hinglish that `compose up/down` is not needed; just browser refresh or re-login is enough.
+
+**Git**
+- Branch: main
+- Commit: Pending commit
+- Push: Pending push
+- Status: Staging and committing memory update
+
 ### 2026-11-02 20:05
 
 **User Request**
