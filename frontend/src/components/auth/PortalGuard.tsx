@@ -62,3 +62,4 @@ export function PortalGuard({ allowedRoles, children }: PortalGuardProps) {
 
   return <>{children}</>;
 }
+
