@@ -42,12 +42,12 @@ function LoginForm() {
   useEffect(() => {
     if (!authLoading && user) {
       if (redirectUrl && isAuthorizedForRoute(user.role, redirectUrl)) {
-        router.replace(redirectUrl);
+        window.location.href = redirectUrl;
       } else {
-        router.replace(getDefaultPortal(user.role));
+        window.location.href = getDefaultPortal(user.role);
       }
     }
-  }, [user, authLoading, redirectUrl, router]);
+  }, [user, authLoading, redirectUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,14 +57,13 @@ function LoginForm() {
     try {
       const loggedUser = await login(email, password);
       if (redirectUrl && isAuthorizedForRoute(loggedUser.role, redirectUrl)) {
-        router.push(redirectUrl);
+        window.location.href = redirectUrl;
       } else {
-        router.push(getDefaultPortal(loggedUser.role));
+        window.location.href = getDefaultPortal(loggedUser.role);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Invalid credentials. Please verify your email and password.";
       setError(msg);
-    } finally {
       setLoading(false);
     }
   };
@@ -73,6 +72,27 @@ function LoginForm() {
     setEmail(demoEmail);
     setPassword("Password123!");
     setError(null);
+    if (typeof window !== "undefined" && window.location.search) {
+      window.history.replaceState(null, "", "/login");
+    }
+  };
+
+  const handleInstantSignIn = async (demoEmail: string) => {
+    setEmail(demoEmail);
+    setPassword("Password123!");
+    setError(null);
+    setLoading(true);
+    if (typeof window !== "undefined" && window.location.search) {
+      window.history.replaceState(null, "", "/login");
+    }
+    try {
+      const loggedUser = await login(demoEmail, "Password123!");
+      window.location.href = getDefaultPortal(loggedUser.role);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to sign in.";
+      setError(msg);
+      setLoading(false);
+    }
   };
 
   return (
@@ -161,57 +181,42 @@ function LoginForm() {
                 Instant Demo Access
               </span>
               <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleQuickLogin("rahul@acme.com")}
-                  className={`p-2 rounded-lg border text-left text-xs transition-colors ${
-                    email === "rahul@acme.com"
-                      ? "bg-indigo-50 border-indigo-200 text-indigo-900 font-semibold"
-                      : "bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  <span className="block font-bold">Rahul Sharma</span>
-                  <span className="text-[10px] text-slate-500 block">Employee Portal</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickLogin("manager@acme.com")}
-                  className={`p-2 rounded-lg border text-left text-xs transition-colors ${
-                    email === "manager@acme.com"
-                      ? "bg-indigo-50 border-indigo-200 text-indigo-900 font-semibold"
-                      : "bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  <span className="block font-bold">Vikram Malhotra</span>
-                  <span className="text-[10px] text-slate-500 block">Manager Portal</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickLogin("hr@acme.com")}
-                  className={`p-2 rounded-lg border text-left text-xs transition-colors ${
-                    email === "hr@acme.com"
-                      ? "bg-indigo-50 border-indigo-200 text-indigo-900 font-semibold"
-                      : "bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  <span className="block font-bold">Sarah Jenkins</span>
-                  <span className="text-[10px] text-slate-500 block">HR Admin Portal</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickLogin("exec@acme.com")}
-                  className={`p-2 rounded-lg border text-left text-xs transition-colors ${
-                    email === "exec@acme.com"
-                      ? "bg-indigo-50 border-indigo-200 text-indigo-900 font-semibold"
-                      : "bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  <span className="block font-bold">David Sterling</span>
-                  <span className="text-[10px] text-slate-500 block">Executive Portal</span>
-                </button>
+                {[
+                  { email: "rahul@acme.com", name: "Rahul Sharma", role: "Employee Portal" },
+                  { email: "manager@acme.com", name: "Vikram Malhotra", role: "Manager Portal" },
+                  { email: "hr@acme.com", name: "Sarah Jenkins", role: "HR Admin Portal" },
+                  { email: "exec@acme.com", name: "David Sterling", role: "Executive Portal" },
+                ].map((persona) => {
+                  const isSelected = email === persona.email;
+                  return (
+                    <button
+                      key={persona.email}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => {
+                        if (isSelected) {
+                          handleInstantSignIn(persona.email);
+                        } else {
+                          handleQuickLogin(persona.email);
+                        }
+                      }}
+                      onDoubleClick={() => handleInstantSignIn(persona.email)}
+                      className={`p-2.5 rounded-lg border text-left text-xs transition-all cursor-pointer flex flex-col justify-between ${
+                        isSelected
+                          ? "bg-indigo-50 border-indigo-300 ring-2 ring-indigo-500/20 text-indigo-900 font-semibold shadow-xs"
+                          : "bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      <div>
+                        <span className="block font-bold">{persona.name}</span>
+                        <span className="text-[10px] text-slate-500 block">{persona.role}</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-[10px] text-indigo-600 font-medium">
+                        <span>{isSelected ? "Click to Sign In →" : "Select"}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </CardContent>

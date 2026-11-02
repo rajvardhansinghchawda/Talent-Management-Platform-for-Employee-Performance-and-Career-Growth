@@ -44,15 +44,12 @@ class LoginView(APIView):
         )
 
         access_token, refresh_token = services.generate_tokens(user)
+        user_data = MeSerializer(user, context={"request": request}).data
 
         response = Response(
             {
                 "access": access_token,
-                "user": {
-                    "id": str(user.id),
-                    "email": user.email,
-                    "role": user.role,
-                },
+                "user": user_data,
                 "must_change_password": user.must_change_password,
                 "available_portals": user.available_portals,
             },
@@ -67,6 +64,7 @@ class LoginView(APIView):
             secure=not settings.DEBUG,
             samesite="Lax",
             max_age=7 * 24 * 60 * 60,  # 7 days
+            path="/",
         )
 
         return response
@@ -75,7 +73,7 @@ class LoginView(APIView):
 class LogoutView(APIView):
     """POST /api/v1/auth/logout/ — blacklists the refresh token and clears cookie."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request: Request) -> Response:
         refresh_token = request.COOKIES.get("refresh_token") or request.data.get("refresh")
@@ -87,7 +85,11 @@ class LogoutView(APIView):
                 pass  # Token already blacklisted or invalid
 
         response = Response({"message": "Successfully logged out."}, status=status.HTTP_200_OK)
-        response.delete_cookie("refresh_token")
+        response.delete_cookie(
+            key="refresh_token",
+            path="/",
+            samesite="Lax",
+        )
         return response
 
 
@@ -132,11 +134,12 @@ class CookieTokenRefreshView(APIView):
                     secure=not settings.DEBUG,
                     samesite="Lax",
                     max_age=7 * 24 * 60 * 60,
+                    path="/",
                 )
 
             return response
         except (TokenError, InvalidToken):
-            return Response(
+            response = Response(
                 {
                     "error": {
                         "code": "authentication_failed",
@@ -145,6 +148,12 @@ class CookieTokenRefreshView(APIView):
                 },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
+            response.delete_cookie(
+                key="refresh_token",
+                path="/",
+                samesite="Lax",
+            )
+            return response
 
 
 class MeView(APIView):

@@ -213,14 +213,16 @@ export function TopBar() {
                       <p className="text-slate-500 truncate text-[11px]">{user?.email || "user@acme.com"}</p>
                     </div>
 
-                    <Link
-                      href="/hr/settings"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center px-3 py-2 hover:bg-slate-50 transition-colors text-slate-700"
-                    >
-                      <Settings className="w-3.5 h-3.5 mr-2 text-slate-400" />
-                      Organization Settings
-                    </Link>
+                    {user?.role === "HR_ADMIN" && (
+                      <Link
+                        href="/hr/settings"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center px-3 py-2 hover:bg-slate-50 transition-colors text-slate-700"
+                      >
+                        <Settings className="w-3.5 h-3.5 mr-2 text-slate-400" />
+                        Organization Settings
+                      </Link>
+                    )}
                     <Link
                       href="/notifications"
                       onClick={() => setProfileOpen(false)}
@@ -251,7 +253,6 @@ export function TopBar() {
                       onClick={async () => {
                         setProfileOpen(false);
                         await logout();
-                        router.push("/login");
                       }}
                       className="w-full flex items-center px-3 py-2 text-red-600 hover:bg-red-50 transition-colors text-left font-medium"
                     >

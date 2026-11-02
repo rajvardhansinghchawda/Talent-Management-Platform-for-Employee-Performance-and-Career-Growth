@@ -212,14 +212,16 @@ export function ManagerTopBar() {
                       <p className="text-slate-500 truncate text-[11px]">{user?.email || "manager@acme.com"}</p>
                     </div>
 
-                    <Link
-                      href="/hr"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center px-3 py-2 hover:bg-slate-50 transition-colors text-slate-700"
-                    >
-                      <ArrowRightLeft className="w-3.5 h-3.5 mr-2 text-indigo-500" />
-                      Switch to HR Admin Portal
-                    </Link>
+                    {(user?.role === "HR_ADMIN" || user?.available_portals?.includes("hr")) && (
+                      <Link
+                        href="/hr"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center px-3 py-2 hover:bg-slate-50 transition-colors text-slate-700"
+                      >
+                        <ArrowRightLeft className="w-3.5 h-3.5 mr-2 text-indigo-500" />
+                        Switch to HR Admin Portal
+                      </Link>
+                    )}
               <Link
                 href="/notifications"
                 onClick={() => setProfileOpen(false)}
@@ -251,7 +253,6 @@ export function ManagerTopBar() {
                 onClick={async () => {
                   setProfileOpen(false);
                   await logout();
-                  router.push("/login");
                 }}
                 className="w-full flex items-center px-3 py-2 text-red-600 hover:bg-red-50 transition-colors text-left font-medium"
               >

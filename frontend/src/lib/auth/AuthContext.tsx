@@ -71,8 +71,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Ignore logout errors
     } finally {
       setAccessToken(null);
-      setUser(null);
-      queryClient.clear();
+      if (typeof window !== "undefined") {
+        delete (window as any).__inMemoryAccessToken;
+        window.location.href = "/login";
+      }
     }
   };
 

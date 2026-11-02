@@ -177,8 +177,13 @@ export async function fetchApi<T>(
     credentials: "include", // send httpOnly cookies
   });
 
-  // Handle 401 with Token Refresh
-  if (response.status === 401 && !endpoint.includes("/auth/login") && !endpoint.includes("/auth/refresh")) {
+  // Handle 401 with Token Refresh (skip for login, refresh, and logout)
+  if (
+    response.status === 401 &&
+    !endpoint.includes("/auth/login") &&
+    !endpoint.includes("/auth/refresh") &&
+    !endpoint.includes("/auth/logout")
+  ) {
     if (isRefreshing) {
       try {
         const { promise, resolve, reject } = Promise.withResolvers<string | null>();

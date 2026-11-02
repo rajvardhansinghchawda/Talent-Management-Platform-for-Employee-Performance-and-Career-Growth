@@ -60,6 +60,78 @@ Talent Management Platform for Employee Performance and Career Growth: A multi-p
 
 ## Interaction History
 
+### 2026-11-02 21:08
+
+**User Request**
+> signout and signin feature not properly work bhai
+
+**Exploration**
+- Investigated full authentication lifecycle between Next.js frontend and Django REST Framework backend:
+  1. `LogoutView` in `backend/apps/accounts/views.py` had `permission_classes = [IsAuthenticated]`. When a user's in-memory access token expired or was absent, `/api/v1/auth/logout/` failed with 401, leaving the httpOnly `refresh_token` cookie intact in the browser.
+  2. `frontend/src/lib/api/client.ts` lacked an exclusion for `/auth/logout` in its 401 interception logic, triggering token refresh loops on logout failures.
+  3. `LoginView` returned a bare `{id, email, role}` object instead of `MeSerializer`, causing user name, employee profile, and designation to be absent on immediate sign-in (displaying initials "M" or "User").
+  4. `AuthContext.tsx` calling `setUser(null)` while on protected portal routes caused `PortalGuard` to trigger and append stale `?redirect=...` query parameters to `/login`.
+  5. Profile menus in `TopBar.tsx` rendered "Organization Settings" (`/hr/settings`) even for regular employees.
+  6. Demo persona pills on `/login` did not clear stale redirect parameters or allow 1-click seamless signing in.
+
+**Work Done**
+- Updated `backend/apps/accounts/views.py`:
+  - Set `LogoutView.permission_classes = [AllowAny]`; always blacklists refresh token if present and deletes `refresh_token` cookie with matching `path="/"` and `samesite="Lax"`.
+  - Updated `LoginView` to serialize user via `MeSerializer(user).data`, providing complete name, designation, department, and employee profile upon sign-in.
+  - Enhanced `CookieTokenRefreshView` to clear invalid/expired refresh cookies on error.
+- Updated `frontend/src/lib/api/client.ts`:
+  - Excluded `/auth/logout` from the 401 auto-refresh handler.
+- Updated `frontend/src/lib/auth/AuthContext.tsx`:
+  - Refactored `logout()` to clear access token, execute backend logout, and directly hard-navigate via `window.location.href = "/login"` without stale redirect query parameters.
+- Updated `frontend/src/app/login/page.tsx`:
+  - Enhanced Instant Demo Access pills with double-click / 2nd-click instant sign in.
+  - Automatically resets stale redirect search parameters when switching between demo roles.
+- Updated `frontend/src/components/shell/TopBar.tsx` and `ManagerTopBar.tsx`:
+  - Scoped "Organization Settings" link exclusively to `HR_ADMIN`.
+  - Cleaned up profile menu sign out handlers.
+- Updated `frontend/src/lib/api/types.ts`:
+  - Added `available_portals`, `employee`, and `organization` fields to `User` interface.
+- Added unit test `test_logout_without_auth_header_still_clears_cookie_and_blacklists` to `test_auth.py`.
+
+**Files Changed**
+- `backend/apps/accounts/views.py`
+  - AllowAny logout with cookie deletion, MeSerializer in login response.
+- `backend/apps/accounts/tests/test_auth.py`
+  - Added test for unauthenticated logout clearing cookie and blacklisting token.
+- `frontend/src/lib/api/client.ts`
+  - Excluded /auth/logout from 401 refresh interceptor.
+- `frontend/src/lib/api/types.ts`
+  - Added User model fields.
+- `frontend/src/lib/auth/AuthContext.tsx`
+  - Clean logout redirection.
+- `frontend/src/app/login/page.tsx`
+  - Clean demo switching, redirect parameter clearing, instant sign-in.
+- `frontend/src/components/shell/TopBar.tsx`
+  - Role-scoped settings, clean sign out.
+- `frontend/src/components/shell/ManagerTopBar.tsx`
+  - Clean sign out and role checking.
+- `memory.md`
+  - Updated interaction record.
+
+**Verification**
+- Live browser test with chrome-devtools MCP:
+  - Verified login as Sarah Jenkins (HR Admin) -> Shows "Sarah Jenkins (SJ)".
+  - Verified sign out -> Redirects cleanly to `http://localhost:3000/login` with NO `?redirect=...`.
+  - Verified login as Vikram Malhotra (Manager) -> Shows "Vikram Malhotra (VM)".
+  - Verified sign out -> Redirects cleanly to `http://localhost:3000/login`.
+  - Verified login as Rahul Sharma (Employee) -> Shows "Rahul Sharma (RS)", no "Organization Settings" link.
+  - Verified sign out -> Redirects cleanly to `http://localhost:3000/login`.
+  - Verified login as David Sterling (Executive) -> Loads Executive portal.
+  - Verified sign out -> Redirects cleanly to `http://localhost:3000/login`.
+- Ran backend test suite: 54 passed in 5.46s (`docker compose exec api pytest -q`).
+- Ran frontend type-check: 0 errors (`npm --prefix frontend run type-check`).
+
+**Git**
+- Branch: main
+- Commit: Pending
+- Push: Pending
+- Status: Clean
+
 ### 2026-11-02 20:30
 
 **User Request**

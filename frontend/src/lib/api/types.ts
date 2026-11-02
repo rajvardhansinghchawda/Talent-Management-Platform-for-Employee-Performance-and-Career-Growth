@@ -8,11 +8,27 @@ export type UserRole = "HR_ADMIN" | "MANAGER" | "EMPLOYEE" | "EXECUTIVE";
 export interface User {
   id: string;
   email: string;
-  first_name: string;
-  last_name: string;
+  first_name?: string;
+  last_name?: string;
   role: UserRole;
-  is_active: boolean;
+  is_active?: boolean;
   must_change_password?: boolean;
+  available_portals?: string[];
+  employee?: {
+    id: string;
+    name: string;
+    preferred_name?: string;
+    photo_url?: string | null;
+    designation?: string | null;
+    department?: string | null;
+  } | null;
+  organization?: {
+    id: string;
+    name: string;
+    logo_url?: string | null;
+    accent_color?: string;
+  } | null;
+  ai_enabled?: boolean;
 }
 
 export type EmploymentStatus = "ACTIVE" | "ON_LEAVE" | "EXITED";

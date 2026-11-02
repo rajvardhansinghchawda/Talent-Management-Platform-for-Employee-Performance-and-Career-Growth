@@ -107,6 +107,27 @@ def test_logout_blacklists_token_and_clears_cookie(client, user):
 
 
 @pytest.mark.django_db
+def test_logout_without_auth_header_still_clears_cookie_and_blacklists(client, user):
+    login_res = client.post(
+        "/api/v1/auth/login/",
+        {"email": "employee@example.com", "password": "StrongPass1!"},
+        format="json",
+    )
+    refresh_token = login_res.cookies["refresh_token"].value
+    client.cookies["refresh_token"] = refresh_token
+
+    # Logout without Bearer token
+    logout_res = client.post("/api/v1/auth/logout/")
+    assert logout_res.status_code == 200
+    assert logout_res.cookies["refresh_token"].value == ""
+
+    # Token should be blacklisted
+    client.cookies["refresh_token"] = refresh_token
+    failed_refresh = client.post("/api/v1/auth/refresh/")
+    assert failed_refresh.status_code == 401
+
+
+@pytest.mark.django_db
 def test_me_endpoint_returns_organization_and_rating_scale(client, user, org):
     client.force_authenticate(user=user)
     response = client.get("/api/v1/auth/me/")
