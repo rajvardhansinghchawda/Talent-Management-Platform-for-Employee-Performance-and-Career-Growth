@@ -60,6 +60,49 @@ Talent Management Platform for Employee Performance and Career Growth: A multi-p
 
 ## Interaction History
 
+### 2026-11-12 18:25
+
+**User Request**
+> See the performance of the app, how much memory it uses, and how we can best utilize/optimize it.
+
+**Exploration**
+- Inspected all 7 running Docker containers via `docker stats --no-stream` to benchmark live CPU, memory consumption, PIDs, and I/O.
+- Measured client-side browser performance on `/login`, `/hr` dashboard, and `/hr/analytics` via Chrome DevTools MCP:
+  - JS Heap usage (`usedJSHeapSize` vs `totalJSHeapSize`).
+  - First paint & First Contentful Paint (FCP).
+  - DOM node count on complex dashboards (270 nodes).
+  - Individual API endpoint round-trip response times (`auth/refresh/`: 31ms, `auth/me/`: 75ms, `notifications/`: 123ms, `dashboards/hr/`: 203ms).
+- Analyzed container architecture to formulate production memory optimization and scaling recommendations.
+
+**Work Done**
+- Benchmark Results:
+  - Total container memory under active load: **~1.07 GiB** across all 7 microservices (`frontend` dev server ~498 MB, `celery worker` ~359 MB, `django api` ~121 MB, `celery beat` ~71 MB, `postgres 16` ~23 MB, `redis 7` ~5 MB, `mailhog` ~2 MB).
+  - Client-side browser memory footprint: **~37 MB - 51 MB** (< 1.3% of 4.19 GB heap limit).
+  - DOM complexity: Only **270 DOM nodes** on heavy data dashboard.
+  - Core API response latency: Fast, ranging from **31ms to 203ms**.
+- Formulated key memory optimization & utilization strategies:
+  1. Next.js standalone multi-stage production build (reduces frontend RAM from ~500 MB to ~80 MB).
+  2. Celery concurrency tuning (`--concurrency=2` or `--autoscale=4,1` to reduce worker RAM from ~360 MB to ~100 MB).
+  3. Redis dashboard aggregate caching with 60s TTL.
+  4. Docker Compose resource constraints (`deploy.resources.limits.memory`).
+  5. TanStack Query caching and table virtualization for 1000+ records.
+
+**Files Changed**
+- `memory.md`
+  - Documented performance benchmarking data, memory metrics, and optimization recommendations.
+
+**Verification**
+- Live measurements captured using Docker CLI `docker stats` and Chrome DevTools MCP `evaluate_script`.
+
+**Response**
+- Comprehensive Hinglish report with exact tables, performance metrics, memory utilization analysis, and step-by-step optimization roadmap.
+
+**Git**
+- Branch: main
+- Commit: Pending commit
+- Push: Pending push
+- Status: Staging and committing memory update
+
 ### 2026-11-02 21:08
 
 **User Request**
